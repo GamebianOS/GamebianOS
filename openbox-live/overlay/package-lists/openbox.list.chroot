@@ -1,0 +1,34 @@
+# Core system and kernel
+sudo
+systemd-sysv
+linux-image-amd64
+
+# Networking and remote access
+network-manager
+iproute2
+openssh-server
+
+# Openbox starter kit (WM + glue components)
+openbox
+obconf
+lxappearance
+thunar
+rofi
+feh
+lxpanel
+
+# Session and display
+xinit
+lightdm
+lightdm-gtk-greeter
+
+# Calamares installer stack
+calamares
+calamares-settings-debian
+qml-module-qtquick-controls2
+
+# Utility terminal + tools
+xfce4-terminal
+git
+vim
+tmux

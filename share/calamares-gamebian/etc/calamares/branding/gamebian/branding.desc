@@ -1,0 +1,39 @@
+---
+componentName: gamebian
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 800px,580px
+windowPlacement: center
+
+strings:
+    productName:         Gamebian
+    shortProductName:    Gamebian
+    version:             ""
+    shortVersion:        ""
+    versionedName:       Gamebian
+    shortVersionedName:  Gamebian
+    bootloaderEntryName: Gamebian
+    productUrl:          https://gamebianos.com/
+    supportUrl:          https://gamebianos.com/
+    knownIssuesUrl:      https://gamebianos.com/
+    releaseNotesUrl:     https://gamebianos.com/
+    donateUrl:           https://gamebianos.com/
+
+sidebar: widget
+navigation: widget
+
+images:
+    productLogo:         "gamebian-logo.png"
+    productIcon:         "gamebian-logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+
+style:
+    SidebarBackground:         "#0145F2"
+    SidebarText:               "#FFFFFF"
+    SidebarTextCurrent:        "#F9F8F4"
+    SidebarBackgroundCurrent:  "#056EDB"
+
+slideshowAPI: 2

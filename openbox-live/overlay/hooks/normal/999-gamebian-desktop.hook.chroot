@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+for d in /etc/skel/Desktop/*.desktop; do
+  [ -f "$d" ] || continue
+  chmod +x "$d"
+done

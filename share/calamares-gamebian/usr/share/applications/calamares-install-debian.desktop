@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install Gamebian
+GenericName=Calamares Installer
+Exec=calamares-install-debian
+Comment=Installer for Gamebian Live
+Keywords=calamares;system;install;gamebian;installer
+Icon=gamebian-console
+Terminal=false
+Categories=Qt;System;
+StartupWMClass=calamares
+StartupNotify=True

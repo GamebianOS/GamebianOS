@@ -1,0 +1,6 @@
+# Gamebian Openbox session
+wall="${HOME}/.local/share/gamebian/background.png"
+if [ -r "${wall}" ]; then
+	feh --no-fehbg --bg-fill "${wall}" &
+fi
+lxpanel &

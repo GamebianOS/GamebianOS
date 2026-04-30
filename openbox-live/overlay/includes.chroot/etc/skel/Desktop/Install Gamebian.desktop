@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install Gamebian
+Comment=Launch the installer to install Gamebian to disk
+Exec=pkexec calamares
+Icon=gamebian-console
+Terminal=false
+Categories=System;
