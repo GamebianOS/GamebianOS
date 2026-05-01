@@ -1,0 +1,84 @@
+/* Gamebian GTK3 — colors from Calamares branding (branding.desc style:)
+ * SidebarBackground #0145F2, SidebarText #FFFFFF
+ * SidebarTextCurrent #F9F8F4, SidebarBackgroundCurrent #056EDB
+ */
+
+@define-color theme_bg_color #0145F2;
+@define-color theme_fg_color #FFFFFF;
+@define-color theme_text_color #FFFFFF;
+@define-color theme_base_color #F9F8F4;
+@define-color theme_view_hover_color #056EDB;
+@define-color theme_selected_bg_color #056EDB;
+@define-color theme_selected_fg_color #F9F8F4;
+@define-color insensitive_bg_color #0238C9;
+@define-color insensitive_fg_color #9EB4F0;
+@define-color borders #0238C9;
+@define-color wm_title #FFFFFF;
+@define-color wm_unfocused_title #C8D4F5;
+
+.background,
+window.background {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+headerbar.titlebar {
+  background: linear-gradient(180deg, @theme_view_hover_color 0%, @theme_bg_color 100%);
+  color: @theme_fg_color;
+  border-bottom: 1px solid @borders;
+}
+
+button {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+  border: 1px solid @borders;
+}
+
+button:hover {
+  background-color: @theme_selected_fg_color;
+  color: @theme_bg_color;
+}
+
+notebook header {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+notebook header tabs tab:checked {
+  background-color: @theme_view_hover_color;
+  color: @theme_selected_fg_color;
+}
+
+scrollbar slider {
+  background-color: @theme_view_hover_color;
+  border: 1px solid @borders;
+}
+
+scrollbar trough {
+  background-color: @theme_bg_color;
+}
+
+popover,
+popover.background,
+menu {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+menuitem:hover,
+menu menuitem:hover {
+  background-color: @theme_view_hover_color;
+  color: @theme_selected_fg_color;
+}
+
+.view,
+viewport view {
+  background-color: @theme_base_color;
+  color: #0145F2;
+}
+
+.view:selected,
+.view:selected:focus {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}

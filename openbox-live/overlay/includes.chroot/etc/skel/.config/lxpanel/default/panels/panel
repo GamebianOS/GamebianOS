@@ -1,4 +1,4 @@
-# Gamebian lxpanel layout (matches Debian lxpanel config syntax)
+# Same as /usr/share/gamebian/lxpanel/panel-installed; live replaces from panel-live via autostart
 Global {
     edge=bottom
     align=left
@@ -6,9 +6,7 @@ Global {
     widthtype=percent
     width=100
     height=30
-    transparent=1
-    tintcolor=#183c7a
-    alpha=120
+    transparent=0
     setdocktype=1
     setpartialstrut=1
     usefontcolor=1

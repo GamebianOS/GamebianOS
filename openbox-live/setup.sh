@@ -24,12 +24,13 @@ if ! command -v lb >/dev/null 2>&1; then
   exit 1
 fi
 
+# No quiet/splash on kernel cmdline: full console output (no Plymouth framebuffer splash).
 lb config \
   --debootstrap-options "--variant=minbase" \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
   --binary-image iso-hybrid \
-  --bootappend-live "boot=live components username=live hostname=gamebian-openbox quiet splash"
+  --bootappend-live "boot=live components username=live hostname=gamebian-openbox"
 
 mkdir -p config/package-lists config/includes.chroot config/hooks/normal config/bootloaders
 shopt -s nullglob
@@ -41,6 +42,14 @@ if [[ -d "$OVERLAY/bootloaders" ]]; then
 fi
 if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
+fi
+
+# Installed session default wallpaper (matches gamebian-installed theme). Live ISO still uses ~/.../gamebian/.
+INST_BG="$SCRIPT_ROOT/design/installed-bakgrounds/background.png"
+INST_BG_DEST="$BUILD_ROOT/config/includes.chroot/usr/share/backgrounds/gamebian-installed"
+if [[ -f "$INST_BG" ]]; then
+  mkdir -p "$INST_BG_DEST"
+  cp -a "$INST_BG" "$INST_BG_DEST/background.png"
 fi
 
 GAMEBIAN_SHARE="$(cd "$SCRIPT_ROOT/../share" && pwd)"

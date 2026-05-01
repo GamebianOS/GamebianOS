@@ -16,15 +16,14 @@ if [[ ! -f "$BUILD_ROOT/.build/config" ]]; then
   exit 1
 fi
 
-# Recover from stale binary stage state (common after package-list edits).
-for _f in \
-  "$BUILD_ROOT/.build/binary_rootfs" \
-  "$BUILD_ROOT/.build/binary_manifest" \
-  "$BUILD_ROOT/.build/binary_package-lists" \
-  "$BUILD_ROOT/.build/binary_linux-image"; do
-  if [[ -e "$_f" ]]; then
-    rm -f "$_f" 2>/dev/null || sudo rm -f "$_f"
-  fi
+# Drop all binary stage markers so binary_chroot/binary_rootfs/iso always match
+# the current chroot. Stale binary_chroot (after ./setup.sh reset chroot, or a
+# failed build) caused: mksquashfs "Cannot stat source directory \"chroot\"".
+shopt -s nullglob
+_stale=( "$BUILD_ROOT"/.build/binary_* )
+shopt -u nullglob
+for _f in "${_stale[@]}"; do
+  rm -f "$_f" 2>/dev/null || sudo rm -f "$_f"
 done
 
 cd "$BUILD_ROOT"

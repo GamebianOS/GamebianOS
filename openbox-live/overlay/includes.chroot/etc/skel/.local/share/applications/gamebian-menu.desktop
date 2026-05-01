@@ -4,6 +4,6 @@ Type=Application
 Name=Applications
 Comment=Browse and launch installed applications (rofi)
 Exec=rofi -show drun -show-icons
-Icon=/home/live/.local/share/gamebian/menu-icon.png
+Icon=/usr/share/pixmaps/menu-icon-default.png
 Terminal=false
 Categories=Utility;

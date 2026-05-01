@@ -23,12 +23,11 @@ cd Build/openbox-live
 
 ## Included starter kit
 
-- Window manager: `openbox`
-- File manager: `thunar`
-- Settings UI: `obconf`, `lxappearance`
-- Panel: `lxpanel` (Debian *testing* currently has no `tint2` binary package; menu button uses `design/menu-icon.png` via rofi)
-- App launcher: `rofi`
-- Wallpaper: `feh` + art from `design/` (applied on login)
-- Installer: `calamares` (`~/Desktop/Install Gamebian.desktop`; Debian’s duplicate Calamares desktop icon autostart is disabled)
+- Display manager / login: `lightdm` + `lightdm-gtk-greeter`; session **`openbox`** (`openbox-session`, autostart + XDG autostart as in skel).
+- Panel: `lxpanel` (launcher uses **`/usr/share/pixmaps/menu-icon-default.png`** for rofi).
+- Appearance: **lxappearance** + **lxappearance-obconf** (GTK + Openbox from one tool).
+- Apps: **rofi**, **feh** (wallpaper from `design/`), **Thunar**, **xfce4-terminal**.
+- Thin base: **`sudo`**, **`systemd-sysv`**, kernel metapackage, **`network-manager`**, **`iproute2`**; **`netsurf-gtk`** for **`x-www-browser`** (chroot hook sets alternatives).
+- Installer: **`calamares`** on the ISO only; **`calamares` / live-\* stacks are purged** on installed disk (**`packages`** job + APT autoremove), with **LightDM** forced to **`openbox`**.
 
 This profile is separate from `Build/minimal-server-live` and `Build/calamares-live`.

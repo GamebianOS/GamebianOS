@@ -19,35 +19,41 @@ fi
 br="$TARGET/etc/calamares/branding/gamebian"
 mkdir -p "$br"
 
-pick_bg() {
-  if [[ -f "$DESIGN/background.png" ]]; then
+# Large welcome / slideshow visuals (productWelcome / show.qml slide1): prefer console.png
+pick_welcome_image() {
+  if [[ -f "$DESIGN/console.png" ]]; then
+    echo "$DESIGN/console.png"
+  elif [[ -f "$DESIGN/background.png" ]]; then
     echo "$DESIGN/background.png"
   elif [[ -f "$DESIGN/menu-icon.png" ]]; then
     echo "$DESIGN/menu-icon.png"
   fi
 }
 
-pick_logo() {
-  if [[ -f "$DESIGN/console.png" ]]; then
+# Sidebar / window icon above the step list (productLogo / productIcon): prefer live-controller.png
+pick_sidebar_logo() {
+  if [[ -f "$DESIGN/live-controller.png" ]]; then
+    echo "$DESIGN/live-controller.png"
+  elif [[ -f "$DESIGN/console.png" ]]; then
     echo "$DESIGN/console.png"
   elif [[ -f "$DESIGN/menu-icon.png" ]]; then
     echo "$DESIGN/menu-icon.png"
   fi
 }
 
-_logo="$(pick_logo)"
-if [[ -n "$_logo" ]]; then
-  cp -a "$_logo" "$br/gamebian-logo.png"
+_sidebar="$(pick_sidebar_logo)"
+if [[ -n "$_sidebar" ]]; then
+  cp -a "$_sidebar" "$br/gamebian-logo.png"
   mkdir -p "$TARGET/usr/share/pixmaps"
-  cp -a "$_logo" "$TARGET/usr/share/pixmaps/gamebian-console.png"
+  cp -a "$_sidebar" "$TARGET/usr/share/pixmaps/gamebian-console.png"
 elif [[ ! -f "$br/gamebian-logo.png" ]]; then
-  echo "merge-calamares-gamebian: warning: missing $DESIGN/console.png or menu-icon.png (installer logo)." >&2
+  echo "merge-calamares-gamebian: warning: missing $DESIGN/live-controller.png (or fallback) for sidebar logo." >&2
 fi
 
-_bg="$(pick_bg)"
-if [[ -n "$_bg" ]]; then
-  cp -a "$_bg" "$br/welcome.png"
-  cp -a "$_bg" "$br/slide1.png"
+_welcome_large="$(pick_welcome_image)"
+if [[ -n "$_welcome_large" ]]; then
+  cp -a "$_welcome_large" "$br/welcome.png"
+  cp -a "$_welcome_large" "$br/slide1.png"
 elif [[ ! -f "$br/welcome.png" ]]; then
-  echo "merge-calamares-gamebian: warning: missing background / images for slideshow." >&2
+  echo "merge-calamares-gamebian: warning: missing $DESIGN/console.png (or fallback) for welcome image." >&2
 fi
