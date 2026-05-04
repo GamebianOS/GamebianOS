@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+chmod 0755 /usr/local/bin/gamebian-controller-menu 2>/dev/null || true
+chmod 0644 /usr/share/gamebian/gamebian_controller_menu.py 2>/dev/null || true
+# Live session user: read /dev/input/event* when logind uaccess is not enough
+if getent passwd live >/dev/null 2>&1; then
+	usermod -aG input live 2>/dev/null || true
+fi

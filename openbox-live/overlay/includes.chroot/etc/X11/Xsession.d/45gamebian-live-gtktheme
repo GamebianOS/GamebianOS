@@ -1,5 +1,0 @@
-# Live ISO keeps Calamares blue GTK theme; disk boot uses ~/.config gtk settings (gamebian-installed).
-if grep -qw boot=live /proc/cmdline 2>/dev/null && [ -z "${GTK_THEME:-}" ]; then
-    GTK_THEME=gamebian
-    export GTK_THEME
-fi

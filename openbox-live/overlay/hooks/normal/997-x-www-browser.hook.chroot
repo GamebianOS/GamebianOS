@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-if [ ! -x /usr/bin/netsurf-gtk ]; then
-  exit 0
-fi
-update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/netsurf-gtk 50
-update-alternatives --set x-www-browser /usr/bin/netsurf-gtk

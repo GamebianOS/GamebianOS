@@ -1,0 +1,3 @@
+#!/bin/sh
+# Debian ships /usr/bin/steam via package steam-installer (testing/stable) or steam-launcher (some suites).
+exec /usr/bin/steam "$@"

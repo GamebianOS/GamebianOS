@@ -1,0 +1,58 @@
+# Gamebian Openbox session
+# Live ISO: keep blue branding (GTK via Xsession.d; WM theme swaps here).
+if grep -qw boot=live /proc/cmdline 2>/dev/null \
+	&& grep -q '<name>gamebian-installed</name>' "${HOME}/.config/openbox/rc.xml" 2>/dev/null; then
+	sed -i 's|<name>gamebian-installed</name>|<name>gamebian</name>|' "${HOME}/.config/openbox/rc.xml"
+	( sleep 0.3 && openbox --reconfigure ) &
+fi
+# Live ISO: design/*.png shipped to ~/ ; installed disk: monochrome system wallpaper
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	wall="${HOME}/.local/share/gamebian/background.png"
+else
+	wall=/usr/share/backgrounds/gamebian-installed/background.png
+	if [ ! -r "${wall}" ]; then wall="${HOME}/.local/share/gamebian/background.png"; fi
+fi
+if [ -r "${wall}" ]; then
+	feh --no-fehbg --bg-fill "${wall}" &
+fi
+
+# lxpanel layout: blue translucency on ISO, opaque black panel on disk installs
+mkdir -p "${HOME}/.config/lxpanel/default/panels"
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	cp -f /usr/share/gamebian/lxpanel/panel-live "${HOME}/.config/lxpanel/default/panels/panel"
+else
+	cp -f /usr/share/gamebian/lxpanel/panel-installed "${HOME}/.config/lxpanel/default/panels/panel"
+fi
+lxpanel &
+
+# Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).
+if command -v gamebian-controller-menu >/dev/null 2>&1; then
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl --user daemon-reload 2>/dev/null || true
+		if systemctl --user start gamebian-controller-menu.service 2>/dev/null; then
+			:
+		else
+			gamebian-controller-menu &
+		fi
+	else
+		gamebian-controller-menu &
+	fi
+fi
+
+# Installed disk: first login — Steam bootstrap in xfce4-terminal (Calamares try_install steam-installer; needs network).
+STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; then
+	if command -v steam >/dev/null 2>&1 && command -v xfce4-terminal >/dev/null 2>&1; then
+		( sleep 2 && xfce4-terminal \
+			--title="Steam setup" \
+			-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+	elif ! command -v steam >/dev/null 2>&1; then
+		# No Steam on target (e.g. offline install) — do not prompt every boot
+		mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
+	fi
+fi
+
+# Calamares only on live session
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	calamares-install-debian &
+fi

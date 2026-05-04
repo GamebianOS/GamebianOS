@@ -29,6 +29,7 @@ navigation: widget
 images:
     productLogo:         "gamebian-logo.png"
     productIcon:         "gamebian-logo.png"
+    productWallpaper:    "product-wallpaper.png"
     productWelcome:      "welcome.png"
 
 slideshow:               "show.qml"

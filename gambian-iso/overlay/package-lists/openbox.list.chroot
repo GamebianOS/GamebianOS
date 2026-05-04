@@ -1,0 +1,34 @@
+# Minimal boot / admin / connectivity (beyond the graphical stack)
+sudo
+systemd-sysv
+linux-image-amd64
+network-manager
+iproute2
+
+# Display manager + Openbox session (exact Gamebian desktop stack)
+lightdm
+lightdm-gtk-greeter
+desktop-base
+
+openbox
+python3
+python3-evdev
+python3-tk
+lxappearance
+lxappearance-obconf
+lxpanel
+rofi
+feh
+thunar
+xfce4-terminal
+netsurf-gtk
+
+# Steam: Debian testing/stable use steam-installer (+ steam-libs, steam-libs-i386), not Valve’s steam-launcher.
+# i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).
+steam-installer
+steam-devices
+
+# Installer (removed from disk install via Calamares packages module + autoremove)
+calamares
+calamares-settings-debian
+qml-module-qtquick-controls2

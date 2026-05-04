@@ -1,0 +1,6 @@
+#!/bin/sh
+# User systemd does not always inherit the X11 session; Openbox autostart does.
+: "${DISPLAY:=:0}"
+: "${XAUTHORITY:=$HOME/.Xauthority}"
+export DISPLAY XAUTHORITY
+exec python3 /usr/share/gamebian/gamebian_controller_menu.py "$@"
