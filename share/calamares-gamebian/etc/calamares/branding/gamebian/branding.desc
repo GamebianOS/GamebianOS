@@ -29,7 +29,6 @@ navigation: widget
 images:
     productLogo:         "gamebian-logo.png"
     productIcon:         "gamebian-logo.png"
-    productWallpaper:    "product-wallpaper.png"
     productWelcome:      "welcome.png"
 
 slideshow:               "show.qml"
@@ -37,7 +36,7 @@ slideshow:               "show.qml"
 style:
     SidebarBackground:         "#0145F2"
     SidebarText:               "#FFFFFF"
-    SidebarTextCurrent:        "#F9F8F4"
+    SidebarTextCurrent:        "#FFFFFF"
     SidebarBackgroundCurrent:  "#056EDB"
 
 slideshowAPI: 2

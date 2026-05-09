@@ -29,3 +29,13 @@ style "gamebian-default" {
 }
 
 class "GtkWidget" style "gamebian-default"
+
+# lxpanel “Panel Preferences” / GTK2 notebooks: widen tab labels (tab-hborder is per side of label)
+style "gamebian-notebook" = "gamebian-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "gamebian-notebook"
+
+gtk-icon-theme-name = "Papirus"

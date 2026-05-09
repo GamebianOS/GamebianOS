@@ -16,6 +16,11 @@ if [[ -d "$ROOT/usr" ]]; then
   cp -a "$ROOT/usr/." "$TARGET/usr/"
 fi
 
+# Calamares shellprocess scripts must be executable in the target chroot.
+if [[ -f "$TARGET/usr/local/sbin/gamebian-web-install" ]]; then
+  chmod 0755 "$TARGET/usr/local/sbin/gamebian-web-install"
+fi
+
 br="$TARGET/etc/calamares/branding/gamebian"
 mkdir -p "$br"
 

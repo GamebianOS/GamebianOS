@@ -1,0 +1,202 @@
+#!/bin/sh
+# Calamares post-install hook: install gamebian-web on the target system.
+#
+# Invoked by /etc/calamares/modules/shellprocess@gamebian-web.conf inside the
+# target chroot (dontChroot: false). The live ISO stages the gamebian-web
+# source tree at /usr/src/gamebian-web/ (Build/gambian-iso/setup.sh); we use
+# that as our offline source. All installation, dependency resolution, and
+# service enablement happen here so the live session never runs gamebian-web.
+
+set -eu
+
+SRC_DIR="/usr/src/gamebian-web"
+LOG_PREFIX="[gamebian-web-install]"
+
+log() { echo "$LOG_PREFIX $*"; }
+
+if [ ! -d "$SRC_DIR" ]; then
+    log "source not found at $SRC_DIR — skipping install"
+    exit 0
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+# Prefer the interpreter module so we do not rely on /usr/bin/pip3 existing
+# (e.g. if only python3-pip was partially installed).
+pip_run() {
+    if python3 -m pip --version >/dev/null 2>&1; then
+        python3 -m pip "$@"
+    elif command -v pip3 >/dev/null 2>&1; then
+        pip3 "$@"
+    else
+        log "error: no pip (install python3-pip)"
+        return 127
+    fi
+}
+
+# Normalize user unit: older pip/console_scripts layouts used ExecStart=/usr/bin/gamebian.
+fix_gamebian_systemd_units() {
+    _fix_one() {
+        _f="$1"
+        if [ ! -f "$_f" ]; then
+            return 0
+        fi
+        if grep -q '^ExecStart=/usr/bin/gamebian' "$_f" 2>/dev/null \
+            || grep -q '^ExecStart=/usr/local/bin/gamebian' "$_f" 2>/dev/null; then
+            log "patching $_f -> python3 -m gamebian_app"
+            sed -i 's|^ExecStart=.*|ExecStart=/usr/bin/python3 -m gamebian_app|' "$_f"
+        fi
+    }
+    _fix_one /usr/lib/systemd/user/gamebian.service
+    _fix_one /lib/systemd/user/gamebian.service
+    _fix_one /usr/local/lib/systemd/user/gamebian.service
+}
+
+run_one_time_fix_script() {
+    _fix_script="$SRC_DIR/scripts/gamebian-web-one-time-fix.sh"
+    if [ -f "$_fix_script" ]; then
+        chmod +x "$_fix_script" 2>/dev/null || true
+    fi
+    if [ -x "$_fix_script" ]; then
+        log "running one-time runtime fix script"
+        "$_fix_script" || log "warning: one-time fix script exited non-zero"
+    else
+        log "one-time fix script not present at $_fix_script (skipping)"
+    fi
+}
+
+# --- 1. Runtime dependencies via apt (must succeed) ------------------------
+# Maps to gamebian_app imports + pip install of gamebian-web (setuptools).
+# Prefer Debian packages for vdf/plyvel so we avoid pip builds where possible.
+# inotify_simple: many suites omit python3-inotify-simple — install PyPI inotify-simple below.
+APT_ALL="
+    flatpak
+    python3
+    python3-pip
+    python3-setuptools
+    python3-wheel
+    python3-bottle
+    python3-yaml
+    python3-requests
+    python3-beaker
+    python3-bcrypt
+    python3-psutil
+    python3-pyudev
+    python3-pyglet
+    python3-pil
+    python3-waitress
+    python3-pyftpdlib
+    python3-vdf
+    python3-plyvel
+"
+
+log "apt-get update"
+apt-get update -qq || log "apt-get update failed (continuing — may use cached lists)"
+
+log "installing gamebian-web APT dependencies (required)"
+# shellcheck disable=SC2086
+apt-get install -y --no-install-recommends $APT_ALL \
+    || {
+        log "error: apt could not install all gamebian-web dependencies"
+        exit 1
+    }
+
+# Pure Python; Debian package name varies by release — always use PyPI.
+log "installing inotify-simple via pip (not reliably available as apt on all suites)"
+pip_run install --break-system-packages --no-input inotify-simple \
+    || {
+        log "error: pip could not install inotify-simple"
+        exit 1
+    }
+
+# --- 2. Pip fallback only for modules still missing after apt --------------
+# Do not use --no-build-isolation here: plyvel may build from sdist.
+need_pip=""
+python3 -c "import vdf" 2>/dev/null || need_pip="${need_pip}${need_pip:+ }vdf"
+python3 -c "import plyvel" 2>/dev/null || need_pip="${need_pip}${need_pip:+ }plyvel"
+if [ -n "$need_pip" ]; then
+    log "installing pip fallback deps: $need_pip"
+    # shellcheck disable=SC2086
+    pip_run install --break-system-packages --no-input $need_pip \
+        || {
+            log "error: pip could not supply missing Python modules: $need_pip"
+            exit 1
+        }
+fi
+
+# --- 3. Install gamebian-web itself ---------------------------------------
+log "installing gamebian-web from $SRC_DIR into /usr"
+# --no-deps: we already provided runtime deps above.
+# --no-build-isolation: use system setuptools (installed above) for setup.py.
+# --prefix=/usr: avoid /usr/local split-brain (units + site-packages must align).
+pip_run install \
+    --break-system-packages \
+    --no-build-isolation \
+    --no-deps \
+    --no-input \
+    --prefix=/usr \
+    "$SRC_DIR"
+
+fix_gamebian_systemd_units
+run_one_time_fix_script
+
+log "verifying third-party Python modules (same imports gamebian_app uses at startup)"
+python3 << 'VERIFY'
+"""Fail fast with a clear error if any apt/python3-* package is missing."""
+import sys
+
+def must(mod):
+    try:
+        __import__(mod)
+    except ImportError as e:
+        print(f"[gamebian-web-install] missing module {mod}: {e}", file=sys.stderr)
+        raise SystemExit(1)
+
+# Direct imports from gamebian_app (see Packages/gamebian-web/gamebian_app/*.py).
+must("yaml")
+must("vdf")
+must("bottle")
+must("bcrypt")
+must("requests")
+must("psutil")
+must("pyudev")
+must("pyftpdlib")
+must("inotify_simple")
+must("plyvel")
+must("waitress")
+# PIL / pyglet are in install_requires but not imported by gamebian_app on startup; still installed via apt.
+import beaker.middleware  # noqa: F401
+import gamebian_app
+VERIFY
+
+# --- 4. Reload systemd unit graph -----------------------------------------
+log "reloading systemd unit graph"
+systemctl daemon-reload || true
+
+# --- 5. Enable system-level services --------------------------------------
+# gamebian-proxy: forwards privileged port 80 → user-mode 8844 listener.
+log "enabling gamebian-proxy.socket"
+systemctl enable gamebian-proxy.socket || log "warning: enable gamebian-proxy.socket failed"
+systemctl enable gamebian-proxy.service || log "warning: enable gamebian-proxy.service failed"
+
+# --- 6. Enable user service for every user (global preset) ----------------
+# gamebian.service is a per-user service. --global creates the wants symlink
+# under /etc/systemd/user/default.target.wants/ so each user picks it up
+# automatically on login.
+log "enabling gamebian.service globally for all users"
+systemctl --global enable gamebian.service || log "warning: --global enable gamebian.service failed"
+
+# steam-patch is bundled with gamebian-web and applies game patches on demand.
+if [ -f /usr/lib/systemd/user/steam-patch.service ] \
+   || [ -f /lib/systemd/user/steam-patch.service ]; then
+    log "enabling steam-patch.service globally"
+    systemctl --global enable steam-patch.service || true
+fi
+
+# Hardware-optional services (NFC reader, cart loader) are intentionally NOT
+# enabled by default — they require physical accessories. Users can opt-in:
+#   systemctl --user enable gamebian-nfc-monitor.service
+#   systemctl --user enable gamebian-cart-monitor.service
+
+log "gamebian-web installation complete"
+exit 0

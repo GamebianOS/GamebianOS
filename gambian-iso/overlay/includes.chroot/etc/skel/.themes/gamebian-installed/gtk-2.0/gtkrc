@@ -29,3 +29,12 @@ style "gamebian-installed-default" {
 }
 
 class "GtkWidget" style "gamebian-installed-default"
+
+style "gamebian-installed-notebook" = "gamebian-installed-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "gamebian-installed-notebook"
+
+gtk-icon-theme-name = "Papirus"

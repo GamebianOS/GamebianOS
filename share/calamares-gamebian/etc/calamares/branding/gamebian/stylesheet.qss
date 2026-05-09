@@ -1,0 +1,109 @@
+/*
+ * Gamebian Calamares — unify light surfaces to pure white (#FFFFFF).
+ * Applied on #mainApp (see CalamaresWindow). Scoped under #viewManager so #sidebarApp stays on branding palette.
+ */
+
+#mainApp {
+    background-color: #FFFFFF;
+}
+
+#backgroundWidget {
+    background-color: #FFFFFF;
+    background-image: none;
+}
+
+#viewManager,
+#viewManagerStack {
+    background-color: #FFFFFF;
+}
+
+#viewManagerStack > QWidget {
+    background-color: #FFFFFF;
+}
+
+/* Bottom navigation strip (QWidget immediately below #viewManager in default bottom-nav layout) */
+#viewManager + QWidget {
+    background-color: #FFFFFF;
+}
+
+#viewManager QScrollArea,
+#viewManager QScrollArea > QWidget > QWidget {
+    background-color: #FFFFFF;
+    border: none;
+}
+
+#scrollAreaWidgetContents {
+    background-color: #FFFFFF;
+}
+
+#viewManager QFrame,
+#viewManager QGroupBox,
+#viewManager QSplitter::handle {
+    background-color: #FFFFFF;
+}
+
+#viewManager QAbstractItemView {
+    background-color: #FFFFFF;
+    alternate-background-color: #FFFFFF;
+}
+
+#viewManager QComboBox,
+#viewManager QLineEdit,
+#viewManager QSpinBox,
+#viewManager QDoubleSpinBox {
+    background-color: #FFFFFF;
+}
+
+#viewManager QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+}
+
+#viewManager QTextEdit,
+#viewManager QPlainTextEdit,
+#viewManager QTextBrowser {
+    background-color: #FFFFFF;
+}
+
+#viewManager QCheckBox,
+#viewManager QRadioButton {
+    background-color: #FFFFFF;
+}
+
+/* Transparent so welcome hero / logos are not covered by solid blocks */
+#viewManager QLabel {
+    background-color: transparent;
+}
+
+#viewManager QTabWidget::pane {
+    background-color: #FFFFFF;
+    border: 1px solid #d0d0d0;
+}
+
+#viewManager QProgressBar {
+    background-color: #FFFFFF;
+    border: 1px solid #d0d0d0;
+}
+
+QPushButton#view-button-back,
+QPushButton#view-button-next,
+QPushButton#view-button-cancel {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #d0d0d0;
+    padding: 6px 14px;
+}
+
+QPushButton#view-button-back:hover,
+QPushButton#view-button-next:hover,
+QPushButton#view-button-cancel:hover {
+    background-color: #FFFFFF;
+    border: 1px solid #0145F2;
+}
+
+QPushButton#view-button-back:disabled,
+QPushButton#view-button-next:disabled,
+QPushButton#view-button-cancel:disabled {
+    background-color: #FFFFFF;
+    color: #888888;
+    border: 1px solid #e0e0e0;
+}

@@ -10,6 +10,11 @@ DESIGN_SHARE="$OVERLAY/includes.chroot/etc/skel/.local/share/gamebian"
 
 mkdir -p "$BUILD_ROOT"
 
+# Separate openbox profile live-build tree; remove so builds do not overlap or leave stale state.
+if [[ -e /home/khinds/gamebianos-build-openbox ]]; then
+  sudo rm -rf /home/khinds/gamebianos-build-openbox
+fi
+
 if [[ -d "$SCRIPT_ROOT/design" ]]; then
   mkdir -p "$DESIGN_SHARE"
   for _img in "$SCRIPT_ROOT/design"/*.png "$SCRIPT_ROOT/design"/*.jpg; do
@@ -80,6 +85,39 @@ for _icon in menu-icon.png menu-icon-default.png; do
     cp -a "$SCRIPT_ROOT/design/$_icon" "$GAMEBIAN_PIX/"
   fi
 done
+
+# Stage gamebian-web source into the live filesystem at /usr/src/gamebian-web.
+# Live session never installs or runs it; the Calamares shellprocess
+# (etc/calamares/modules/shellprocess@gamebian-web.conf) materialises it on the
+# target disk during installation. Keep payload small by excluding VCS/test/CI.
+GAMEBIAN_WEB_SRC="$(cd "$SCRIPT_ROOT/../../Packages/gamebian-web" 2>/dev/null && pwd || true)"
+if [[ -n "$GAMEBIAN_WEB_SRC" && -f "$GAMEBIAN_WEB_SRC/setup.py" ]]; then
+  GAMEBIAN_WEB_DEST="$BUILD_ROOT/config/includes.chroot/usr/src/gamebian-web"
+  mkdir -p "$GAMEBIAN_WEB_DEST"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude='.git' --exclude='.github' --exclude='__pycache__' \
+      --exclude='*.pyc' --exclude='tests/' --exclude='screenshots/' \
+      --exclude='.markdownlint.json' --exclude='Dockerfile' \
+      --exclude='requirements-container.txt' --exclude='requirements-test.txt' \
+      --exclude='run-tests' \
+      "$GAMEBIAN_WEB_SRC/" "$GAMEBIAN_WEB_DEST/"
+  else
+    # rsync not available — fall back to cp -a then prune known excludes.
+    cp -a "$GAMEBIAN_WEB_SRC/." "$GAMEBIAN_WEB_DEST/"
+    rm -rf \
+      "$GAMEBIAN_WEB_DEST/.git" "$GAMEBIAN_WEB_DEST/.github" \
+      "$GAMEBIAN_WEB_DEST/tests" "$GAMEBIAN_WEB_DEST/screenshots" \
+      "$GAMEBIAN_WEB_DEST/Dockerfile" \
+      "$GAMEBIAN_WEB_DEST/requirements-container.txt" \
+      "$GAMEBIAN_WEB_DEST/requirements-test.txt" \
+      "$GAMEBIAN_WEB_DEST/run-tests" \
+      "$GAMEBIAN_WEB_DEST/.markdownlint.json" 2>/dev/null || true
+  fi
+  echo "Staged gamebian-web source -> $GAMEBIAN_WEB_DEST"
+else
+  echo "WARNING: gamebian-web source not found at $SCRIPT_ROOT/../../Packages/gamebian-web — target will not get the web utility" >&2
+fi
 
 GAMEBIAN_SHARE="$(cd "$SCRIPT_ROOT/../share" && pwd)"
 if [[ -f "$GAMEBIAN_SHARE/merge-calamares-gamebian.sh" ]]; then

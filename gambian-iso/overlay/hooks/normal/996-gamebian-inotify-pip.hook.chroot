@@ -1,0 +1,8 @@
+#!/bin/sh
+# inotify_simple is imported by steam-patch / gamebian-web; Debian does not always
+# ship python3-inotify-simple under that name — install the PyPI wheel (pure Python).
+set -eu
+if python3 -c "import inotify_simple" 2>/dev/null; then
+	exit 0
+fi
+python3 -m pip install --break-system-packages --no-input inotify-simple

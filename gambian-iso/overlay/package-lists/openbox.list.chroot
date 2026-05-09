@@ -4,6 +4,18 @@ systemd-sysv
 linux-image-amd64
 network-manager
 iproute2
+openssh-client
+openssh-server
+vim
+
+# Icon themes (Papirus is default in skel GTK settings; others available in lxappearance)
+adwaita-icon-theme
+adwaita-icon-theme-legacy
+mint-y-icons
+numix-icon-theme-circle
+paper-icon-theme
+papirus-icon-theme
+yaru-theme-icon
 
 # Display manager + Openbox session (exact Gamebian desktop stack)
 lightdm

@@ -40,6 +40,16 @@ notebook header {
   color: @theme_fg_color;
 }
 
+notebook header tabs tab {
+  padding: 8px 16px;
+  margin: 0 3px;
+  min-height: 1.2em;
+}
+
+notebook header tabs tab label {
+  padding: 2px 4px;
+}
+
 notebook header tabs tab:checked {
   background-color: #1f1f1f;
   color: #ffffff;
@@ -67,6 +77,24 @@ menuitem:hover,
 menu menuitem:hover {
   background-color: #353535;
   color: #ffffff;
+}
+
+menubar {
+  padding: 2px 4px;
+}
+
+menubar > menuitem {
+  padding: 6px 12px;
+}
+
+menubar > menuitem:hover {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+}
+
+menu menuitem {
+  padding: 6px 16px;
+  min-height: 1.5em;
 }
 
 .view,

@@ -3,3 +3,8 @@ if grep -qw boot=live /proc/cmdline 2>/dev/null && [ -z "${GTK_THEME:-}" ]; then
     GTK_THEME=gamebian
     export GTK_THEME
 fi
+# Icon theme Papirus regardless of GTK_THEME override (GTK3 fallback).
+if grep -qw boot=live /proc/cmdline 2>/dev/null && [ -z "${GTK_ICON_THEME:-}" ]; then
+    GTK_ICON_THEME=Papirus
+    export GTK_ICON_THEME
+fi
