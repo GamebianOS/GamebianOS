@@ -25,6 +25,11 @@ else
 fi
 lxpanel &
 
+# nm-tray after lxpanel: SystemTray must exist before Qt embeds icons (fixes "No Icon set").
+if command -v nm-tray >/dev/null 2>&1 && ! pgrep -x nm-tray >/dev/null 2>&1; then
+	(sleep 2; env QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 nm-tray >/dev/null 2>&1) &
+fi
+
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).
 if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	if command -v systemctl >/dev/null 2>&1; then

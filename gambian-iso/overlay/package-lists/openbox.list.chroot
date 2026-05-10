@@ -3,6 +3,14 @@ sudo
 systemd-sysv
 linux-image-amd64
 network-manager
+# Tray: nm-tray (Qt) — gtk3 platform theme loads GTK/icon settings; start after lxpanel in autostart
+nm-tray
+qt5-gtk-platformtheme
+qt6-gtk-platformtheme
+hicolor-icon-theme
+libqt5svg5
+# Standalone NM connection GUI (pairs with nm-tray — do not rely on applet metapackages)
+nm-connection-editor
 iproute2
 openssh-client
 openssh-server

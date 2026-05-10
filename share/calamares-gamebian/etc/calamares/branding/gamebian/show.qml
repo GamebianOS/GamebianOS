@@ -25,8 +25,10 @@ Presentation
             anchors.horizontalCenter: background1.horizontalCenter
             anchors.top: background1.bottom
             color: "#000000"
-            text: qsTr("Welcome to Gamebian.<br/>" +
-                  "The rest of the installation is automated and should complete in a few minutes.")
+            text: qsTr("Welcome to Gamebian.<br/><br/>" +
+                  "Connect this computer to the internet (Wi‑Fi or Ethernet on the panel). " +
+                  "The installer needs a reachable mirror for package downloads (Calamares will not proceed without connectivity).<br/><br/>" +
+                  "The rest of the installation is automated.")
             wrapMode: Text.WordWrap
             width: 600
             horizontalAlignment: Text.Center
