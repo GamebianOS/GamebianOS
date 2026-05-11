@@ -25,9 +25,27 @@ else
 fi
 lxpanel &
 
+# PolicyKit UI (must run in the X session before NM secret / control prompts work reliably).
+# Trixie+: policykit-1-gnome is gone; mate-polkit / lxpolkit supply agents.
+POLKIT_AGENT=""
+for _p in /usr/libexec/polkit-gnome-authentication-agent-1 \
+	/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 \
+	/usr/libexec/polkit-mate-authentication-agent-1 \
+	/usr/bin/lxpolkit; do
+	if [ -x "${_p}" ]; then POLKIT_AGENT="${_p}"; break; fi
+done
+if [ -n "${POLKIT_AGENT}" ]; then
+	"${POLKIT_AGENT}" >/dev/null 2>&1 &
+fi
+
 # nm-tray after lxpanel: SystemTray must exist before Qt embeds icons (fixes "No Icon set").
 if command -v nm-tray >/dev/null 2>&1 && ! pgrep -x nm-tray >/dev/null 2>&1; then
-	(sleep 2; env QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 nm-tray >/dev/null 2>&1) &
+	(sleep 2; env QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_IM_MODULE= nm-tray >/dev/null 2>&1) &
+fi
+
+# Bluetooth systray (GTK — uses GTK_ICON_THEME=Papirus from Xsession.d like other tray icons).
+if command -v blueman-applet >/dev/null 2>&1 && ! pgrep -f '[b]lueman-applet' >/dev/null 2>&1; then
+	(sleep 2; blueman-applet >/dev/null 2>&1) &
 fi
 
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).
@@ -55,6 +73,21 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 		# No Steam on target (e.g. offline install) — do not prompt every boot
 		mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
 	fi
+fi
+
+# Installed disk: after first-boot Steam wizard (marker exists), open Big Picture in nested gamescope.
+# Quitting Steam returns to Openbox; relaunch via menu "Steam Big Picture" or Super+Shift+S.
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
+	&& [ -f "${STEAM_ONCE}" ] \
+	&& command -v steam >/dev/null 2>&1 \
+	&& command -v gamescope >/dev/null 2>&1 \
+	&& [ -x /usr/local/bin/gamebian-steam-bigpicture ]; then
+	(
+		# Delay so Wi‑Fi passphrase dialogs / PolKit can finish before gamescope grabs the session.
+		sleep 25
+		! pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 || exit 0
+		/usr/local/bin/gamebian-steam-bigpicture
+	) &
 fi
 
 # Calamares only on live session

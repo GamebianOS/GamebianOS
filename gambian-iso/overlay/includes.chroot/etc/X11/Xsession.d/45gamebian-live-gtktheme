@@ -1,10 +1,15 @@
-# Live ISO keeps Calamares blue GTK theme; disk boot uses ~/.config gtk settings (gamebian-installed).
-if grep -qw boot=live /proc/cmdline 2>/dev/null && [ -z "${GTK_THEME:-}" ]; then
-    GTK_THEME=gamebian
+# GTK theme: live ISO (gamebian) vs installed disk (gamebian-installed), if not already set.
+if [ -z "${GTK_THEME:-}" ]; then
+    if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+        GTK_THEME=gamebian
+    else
+        GTK_THEME=gamebian-installed
+    fi
     export GTK_THEME
 fi
-# Icon theme Papirus regardless of GTK_THEME override (GTK3 fallback).
-if grep -qw boot=live /proc/cmdline 2>/dev/null && [ -z "${GTK_ICON_THEME:-}" ]; then
+# Icon theme: export for every boot session (not only live). Qt gtk3 platform (nm-tray) uses GtkSettings;
+# without this on disk installs, tray icons (e.g. NM, Bluetooth) can render missing / wrong vs live ISO.
+if [ -z "${GTK_ICON_THEME:-}" ]; then
     GTK_ICON_THEME=Papirus
     export GTK_ICON_THEME
 fi

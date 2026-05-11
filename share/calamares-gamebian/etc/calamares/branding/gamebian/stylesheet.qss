@@ -44,7 +44,10 @@
 
 #viewManager QAbstractItemView {
     background-color: #FFFFFF;
-    alternate-background-color: #FFFFFF;
+    alternate-background-color: #F8F9FA;
+    color: #000000;
+    selection-background-color: #056EDB;
+    selection-color: #FFFFFF;
 }
 
 #viewManager QComboBox,
@@ -52,10 +55,47 @@
 #viewManager QSpinBox,
 #viewManager QDoubleSpinBox {
     background-color: #FFFFFF;
+    color: #000000;
 }
 
 #viewManager QComboBox QAbstractItemView {
     background-color: #FFFFFF;
+    color: #000000;
+    selection-background-color: #056EDB;
+    selection-color: #FFFFFF;
+    outline: 0;
+}
+
+#viewManager QComboBox QAbstractItemView::item {
+    padding: 2px;
+    color: #000000;
+}
+
+#viewManager QComboBox QAbstractItemView::item:selected {
+    background-color: #056EDB;
+    color: #FFFFFF;
+}
+
+#viewManager QComboBox QAbstractItemView::item:hover {
+    background-color: #E8EEF9;
+    color: #000000;
+}
+
+/* Partition editor “settings” and other popup menus — default theme can paint white-on-white here */
+#viewManager QMenu {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #d0d0d0;
+}
+
+#viewManager QMenu::item:selected {
+    background-color: #056EDB;
+    color: #FFFFFF;
+}
+
+#viewManager QMenu::item:!selected:hover {
+    background-color: #E8EEF9;
+    color: #000000;
 }
 
 #viewManager QTextEdit,

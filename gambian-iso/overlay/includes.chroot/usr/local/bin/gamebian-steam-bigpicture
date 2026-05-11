@@ -1,0 +1,36 @@
+#!/bin/sh
+# Launch Steam Big Picture inside gamescope, nested in an existing Openbox X session.
+# -e: embed under host X11; -f: fullscreen that window (deck-like; not a small decor window).
+# Quitting Steam exits gamescope and returns to Openbox.
+# Set GAMEBIAN_GAMESCOPE_WINDOWED=1 to drop -f (debug / windowed).
+
+set -eu
+
+if ! command -v gamescope >/dev/null 2>&1; then
+	echo "gamebian-steam-bigpicture: gamescope not installed" >&2
+	exit 1
+fi
+if ! command -v steam >/dev/null 2>&1; then
+	echo "gamebian-steam-bigpicture: steam not on PATH — finish first-boot Steam setup first" >&2
+	exit 1
+fi
+
+# Single client: launching again focuses use case "return from desktop".
+if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
+	exit 0
+fi
+
+# Default: modern gamepad UI. Set STEAM_BIGPICTURE_UI=classic for old Big Picture (-bigpicture).
+case "${STEAM_BIGPICTURE_UI:-gamepad}" in
+	classic|bigpicture)
+		STEAM_EXTRA="-bigpicture" ;;
+	*)
+		STEAM_EXTRA="-gamepadui" ;;
+esac
+
+FULLSCREEN="-f"
+case "${GAMEBIAN_GAMESCOPE_WINDOWED:-}" in
+	1|yes|true|YES|TRUE) FULLSCREEN="" ;;
+esac
+
+exec gamescope -e ${FULLSCREEN} -- steam "${STEAM_EXTRA}" "$@"

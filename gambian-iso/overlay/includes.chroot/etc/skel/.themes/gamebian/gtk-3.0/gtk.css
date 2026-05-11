@@ -111,3 +111,28 @@ viewport view {
   background-color: @theme_selected_bg_color;
   color: @theme_selected_fg_color;
 }
+
+/* GtkCalendar (lxpanel dclock popup): day grid must not inherit window fg on a light fill */
+calendar {
+  background-color: @theme_base_color;
+  color: #0145f2;
+}
+
+calendar.header {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+calendar.button {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+}
+
+calendar:selected {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+calendar:indeterminate {
+  color: alpha(#0145f2, 0.45);
+}

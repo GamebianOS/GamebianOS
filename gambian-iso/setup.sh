@@ -29,7 +29,7 @@ if ! command -v lb >/dev/null 2>&1; then
   exit 1
 fi
 
-# No quiet/splash on kernel cmdline: full console output (no Plymouth framebuffer splash).
+# No kernel splash: Plymouth/framebuffer takeover hides printk on tty; GRUB GFX menu stays (bootloaders/splash.png).
 lb config \
   --debootstrap-options "--variant=minbase" \
   --debian-installer none \
@@ -69,13 +69,23 @@ if [[ -f "$INST_ART/user-installed-icon.png" ]]; then
   cp -a "$INST_ART/user-installed-icon.png" "$GAMEBIAN_PIX/"
 fi
 GRUB_CER="$BUILD_ROOT/config/includes.chroot/usr/share/desktop-base/ceratopsian-theme/grub"
+LBL_GRUB="$BUILD_ROOT/config/bootloaders/grub-pc"
+GB_BR="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/branding"
 if [[ -f "$INST_ART/grub-16x9.png" ]]; then
-  mkdir -p "$GRUB_CER"
+  mkdir -p "$GRUB_CER" "$GB_BR/grub" "$GB_BR" "$LBL_GRUB"
   cp -a "$INST_ART/grub-16x9.png" "$GRUB_CER/"
+  cp -a "$INST_ART/grub-16x9.png" "$GB_BR/grub-16x9.png"
+  cp -a "$INST_ART/grub-16x9.png" "$GB_BR/grub/wallpaper.png"
+  cp -a "$INST_ART/grub-16x9.png" "$LBL_GRUB/splash.png"
 fi
 if [[ -f "$INST_ART/grub-4x3.png" ]]; then
-  mkdir -p "$GRUB_CER"
+  mkdir -p "$GRUB_CER" "$GB_BR"
   cp -a "$INST_ART/grub-4x3.png" "$GRUB_CER/"
+  cp -a "$INST_ART/grub-4x3.png" "$GB_BR/grub-4x3.png"
+fi
+if [[ -f "$INST_ART/grub-square.png" ]]; then
+  mkdir -p "$GB_BR"
+  cp -a "$INST_ART/grub-square.png" "$GB_BR/grub-square.png"
 fi
 
 # Panel / rofi launcher icons: live ISO vs installed disk (see gamebian-menu*.desktop + lxpanel).

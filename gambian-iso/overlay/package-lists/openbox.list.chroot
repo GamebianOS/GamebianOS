@@ -3,14 +3,19 @@ sudo
 systemd-sysv
 linux-image-amd64
 network-manager
-# Tray: nm-tray (Qt) — gtk3 platform theme loads GTK/icon settings; start after lxpanel in autostart
+# Tray: nm-tray (Qt); blueman-applet (GTK) for Bluetooth — start after lxpanel systray in autostart
 nm-tray
+bluez
+blueman
 qt5-gtk-platformtheme
 qt6-gtk-platformtheme
 hicolor-icon-theme
 libqt5svg5
 # Standalone NM connection GUI (pairs with nm-tray — do not rely on applet metapackages)
 nm-connection-editor
+# Graphical PolKit agent: without it, Wi‑Fi / NM prompts may not accept keyboard input under Openbox.
+# PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides GTK prompts for NM, etc.)
+mate-polkit
 iproute2
 openssh-client
 openssh-server
@@ -47,6 +52,8 @@ netsurf-gtk
 # i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).
 steam-installer
 steam-devices
+# Nested Big Picture session under Openbox (/usr/local/bin/gamebian-steam-bigpicture uses gamescope -e).
+gamescope
 
 # Installer (removed from disk install via Calamares packages module + autoremove)
 calamares

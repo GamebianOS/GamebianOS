@@ -108,3 +108,28 @@ viewport view {
   background-color: @theme_selected_bg_color;
   color: @theme_selected_fg_color;
 }
+
+/* GtkCalendar (lxpanel dclock popup): force base surface + fg (fixes white-on-white day grid) */
+calendar {
+  background-color: @theme_base_color;
+  color: @theme_fg_color;
+}
+
+calendar.header {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+calendar.button {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+}
+
+calendar:selected {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+calendar:indeterminate {
+  color: @insensitive_fg_color;
+}

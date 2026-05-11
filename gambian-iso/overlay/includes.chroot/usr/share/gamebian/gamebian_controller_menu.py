@@ -146,6 +146,21 @@ class TriggerState:
         return False
 
 
+def steam_is_running() -> bool:
+    """True if the Steam client process is active for this user (desktop or Big Picture)."""
+    uid = os.getuid()
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-u", str(uid), "-x", "steam"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def programs_from_config(cfg: configparser.ConfigParser) -> list[tuple[str, str]]:
     if not cfg.has_section("programs"):
         return []
@@ -321,7 +336,13 @@ def run() -> None:
                 break
 
         if fired and items:
-            MenuApp(items, opened).root.mainloop()
+            skip_if_steam = cfg.getboolean(
+                "trigger",
+                "skip_when_steam_running",
+                fallback=True,
+            )
+            if not skip_if_steam or not steam_is_running():
+                MenuApp(items, opened).root.mainloop()
             trigger = TriggerState(cfg.get("trigger", "mode", fallback="guide"))
 
 

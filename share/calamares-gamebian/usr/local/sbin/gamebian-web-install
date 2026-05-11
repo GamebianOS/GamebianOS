@@ -110,6 +110,18 @@ pip_run install --break-system-packages --no-input inotify-simple \
     }
 
 # --- 2. Pip fallback only for modules still missing after apt --------------
+# bcrypt: distro python3-bcrypt can be incomplete on some Python versions
+# (ImportError: No module named 'bcrypt._bcrypt'). Force a PyPI wheel into
+# the default pip prefix (typically /usr/local/...), which shadows broken apt bits.
+if ! python3 -c "import bcrypt" 2>/dev/null; then
+    log "installing bcrypt via pip (distro package missing working native extension)"
+    pip_run install --break-system-packages --no-input --upgrade --force-reinstall bcrypt \
+        || {
+            log "error: pip could not install bcrypt"
+            exit 1
+        }
+fi
+
 # Do not use --no-build-isolation here: plyvel may build from sdist.
 need_pip=""
 python3 -c "import vdf" 2>/dev/null || need_pip="${need_pip}${need_pip:+ }vdf"
