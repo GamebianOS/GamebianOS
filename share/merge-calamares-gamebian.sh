@@ -17,7 +17,9 @@ if [[ -d "$ROOT/usr" ]]; then
 fi
 
 # Calamares shellprocess helpers.
-for _sbin in "$TARGET/usr/local/sbin/gamebian-web-install"; do
+for _sbin in \
+  "$TARGET/usr/local/sbin/gamebian-web-install" \
+  "$TARGET/usr/local/sbin/gamebian-nm-user-perms.sh"; do
   if [[ -f "$_sbin" ]]; then
     chmod 0755 "$_sbin"
   fi

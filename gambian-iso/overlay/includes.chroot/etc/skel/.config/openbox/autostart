@@ -40,12 +40,12 @@ fi
 
 # nm-tray after lxpanel: SystemTray must exist before Qt embeds icons (fixes "No Icon set").
 if command -v nm-tray >/dev/null 2>&1 && ! pgrep -x nm-tray >/dev/null 2>&1; then
-	(sleep 2; env QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_IM_MODULE= nm-tray >/dev/null 2>&1) &
+	(sleep 2; env GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}" QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_IM_MODULE= nm-tray >/dev/null 2>&1) &
 fi
 
 # Bluetooth systray (GTK — uses GTK_ICON_THEME=Papirus from Xsession.d like other tray icons).
 if command -v blueman-applet >/dev/null 2>&1 && ! pgrep -f '[b]lueman-applet' >/dev/null 2>&1; then
-	(sleep 2; blueman-applet >/dev/null 2>&1) &
+	(sleep 2; env GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}" blueman-applet >/dev/null 2>&1) &
 fi
 
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).

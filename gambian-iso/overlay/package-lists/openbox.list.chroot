@@ -16,6 +16,9 @@ nm-connection-editor
 # Graphical PolKit agent: without it, Wi‑Fi / NM prompts may not accept keyboard input under Openbox.
 # PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides GTK prompts for NM, etc.)
 mate-polkit
+# Secret service + PAM unlock: NM / nm-tray store Wi‑Fi PSKs reliably (avoids broken passphrase prompts).
+gnome-keyring
+libpam-gnome-keyring
 iproute2
 openssh-client
 openssh-server
