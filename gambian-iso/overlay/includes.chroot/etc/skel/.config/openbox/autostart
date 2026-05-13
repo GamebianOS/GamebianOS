@@ -62,20 +62,35 @@ if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	fi
 fi
 
-# Installed disk: first login — Steam bootstrap in xfce4-terminal (Calamares try_install steam-installer; needs network).
+# Installed disk — two-phase Steam (not live):
+# 1) Until ~/.config/gamebian-firstboot-steam.done: open Steam setup in a terminal once (or skip if Steam
+#    already has a login from a prior run). 2) On every later Openbox start: nested gamescope + Steam UI;
+#    quit Steam to return to the desktop (see /usr/local/bin/gamebian-steam-bigpicture).
+# gamebian-firstboot-steam.prompted: auto-open the setup terminal at most once until done (avoids apt/Steam
+# re-prompt every Openbox login if the window was closed early).
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
+STEAM_PROMPTED="${HOME}/.config/gamebian-firstboot-steam.prompted"
+STEAM_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; then
 	if command -v steam >/dev/null 2>&1 && command -v xfce4-terminal >/dev/null 2>&1; then
-		( sleep 2 && xfce4-terminal \
-			--title="Steam setup" \
-			-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+		# Already ran Steam and logged in (e.g. outside this script): do not reopen setup every boot.
+		if [ -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
+			mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
+		elif [ ! -f "${STEAM_PROMPTED}" ]; then
+			mkdir -p "${HOME}/.config"
+			: > "${STEAM_PROMPTED}"
+			( sleep 2 && xfce4-terminal \
+				--title="Steam setup" \
+				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+		fi
 	elif ! command -v steam >/dev/null 2>&1; then
 		# No Steam on target (e.g. offline install) — do not prompt every boot
 		mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
 	fi
 fi
 
-# Installed disk: after first-boot Steam wizard (marker exists), open Big Picture in nested gamescope.
+# Installed disk: after first-boot marker exists, open Big Picture in nested gamescope each login.
 # Quitting Steam returns to Openbox; relaunch via menu "Steam Big Picture" or Super+Shift+S.
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
 	&& [ -f "${STEAM_ONCE}" ] \

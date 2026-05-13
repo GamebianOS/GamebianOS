@@ -44,12 +44,17 @@ python3-evdev
 python3-tk
 lxappearance
 lxappearance-obconf
+# X11 resolution / monitor mode picker (RandR); pairs with Openbox on Gamebian.
+lxrandr
 lxpanel
 rofi
 feh
 thunar
 xfce4-terminal
-netsurf-gtk
+# GNOME Web (WebKitGTK); chroot hook sets x-www-browser alternative.
+epiphany-browser
+# Audio mixer GUI (outputs, per-app levels); works with PipeWire via Pulse compatibility.
+pavucontrol
 
 # Steam: Debian testing/stable use steam-installer (+ steam-libs, steam-libs-i386), not Valve’s steam-launcher.
 # i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).

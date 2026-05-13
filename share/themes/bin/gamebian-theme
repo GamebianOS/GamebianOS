@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run from repo without pip install: execute from Build/share/themes directory.
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+exec env PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}" python3 -m gamebian_theme "$@"

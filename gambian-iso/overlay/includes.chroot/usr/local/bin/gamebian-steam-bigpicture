@@ -6,6 +6,8 @@
 
 set -eu
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
 if ! command -v gamescope >/dev/null 2>&1; then
 	echo "gamebian-steam-bigpicture: gamescope not installed" >&2
 	exit 1

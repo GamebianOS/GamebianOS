@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
-if [ ! -x /usr/bin/netsurf-gtk ]; then
+if [ ! -x /usr/bin/epiphany-browser ]; then
   exit 0
 fi
-update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/netsurf-gtk 50
-update-alternatives --set x-www-browser /usr/bin/netsurf-gtk
+update-alternatives --install /usr/bin/x-www-browser x-www-browser /usr/bin/epiphany-browser 50
+update-alternatives --set x-www-browser /usr/bin/epiphany-browser

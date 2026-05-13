@@ -1,0 +1,43 @@
+#!/bin/sh
+# LightDM X session: Steam inside gamescope as the whole session (no Openbox / lxpanel).
+# Uses gamescope -e -f on the LightDM-started X server (same stack as gamebian-steam-bigpicture).
+#
+# Until Steam first-boot is finished (~/.config/gamebian-firstboot-steam.done or loginusers.vdf),
+# fall through to Openbox so autostart can run the one-time setup terminal (not this session).
+
+set -eu
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+	eval "$(dbus-launch --sh-syntax --exit-with-session)" || true
+fi
+
+POLKIT_AGENT=""
+for _p in /usr/libexec/polkit-gnome-authentication-agent-1 \
+	/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 \
+	/usr/libexec/polkit-mate-authentication-agent-1 \
+	/usr/bin/lxpolkit; do
+	if [ -x "${_p}" ]; then
+		POLKIT_AGENT="${_p}"
+		break
+	fi
+done
+if [ -n "${POLKIT_AGENT}" ]; then
+	"${POLKIT_AGENT}" >/dev/null 2>&1 &
+fi
+
+STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
+STEAM_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
+
+# Installed disk only: kiosk after Steam is ready; otherwise Openbox + autostart handles setup.
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	if [ ! -f "${STEAM_ONCE}" ] && [ ! -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
+		exec /usr/bin/openbox-session
+	fi
+	if ! command -v steam >/dev/null 2>&1 || ! command -v gamescope >/dev/null 2>&1; then
+		exec /usr/bin/openbox-session
+	fi
+fi
+
+exec /usr/local/bin/gamebian-steam-bigpicture

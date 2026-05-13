@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Steam Big Picture
-Comment=Steam gamepad UI inside gamescope (nested under Openbox)
+Comment=Steam gamepad UI inside gamescope (nested under Openbox, or standalone session)
 Exec=/usr/local/bin/gamebian-steam-bigpicture
 TryExec=gamescope
 Icon=steam

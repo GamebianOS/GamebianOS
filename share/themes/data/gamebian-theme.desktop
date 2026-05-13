@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Gamebian theme
+Comment=Change wallpaper and GTK/Openbox color scheme
+Exec=gamebian-theme
+Icon=preferences-desktop-theme
+Categories=Settings;DesktopSettings;GTK;
+Terminal=false

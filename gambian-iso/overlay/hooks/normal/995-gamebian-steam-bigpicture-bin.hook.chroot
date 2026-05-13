@@ -2,3 +2,4 @@
 set -e
 
 chmod 0755 /usr/local/bin/gamebian-steam-bigpicture 2>/dev/null || true
+chmod 0755 /usr/local/bin/gamebian-steam-gamescope-session 2>/dev/null || true

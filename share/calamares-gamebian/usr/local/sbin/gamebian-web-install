@@ -3,7 +3,8 @@
 #
 # Invoked by /etc/calamares/modules/shellprocess@gamebian-web.conf inside the
 # target chroot (dontChroot: false). The live ISO stages the gamebian-web
-# source tree at /usr/src/gamebian-web/ (Build/gambian-iso/setup.sh); we use
+# source tree at /usr/src/gamebian-web/ (gambian-iso/setup.sh copies repo
+# Packages/gamebian-web); we use
 # that as our offline source. All installation, dependency resolution, and
 # service enablement happen here so the live session never runs gamebian-web.
 

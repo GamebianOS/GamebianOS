@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=Gamebian Steam (gamescope)
+Comment=Steam in fullscreen gamescope — no Openbox desktop
+Exec=/usr/local/bin/gamebian-steam-gamescope-session
+TryExec=/usr/local/bin/gamebian-steam-gamescope-session
+Type=Application
+DesktopNames=Gamebian
