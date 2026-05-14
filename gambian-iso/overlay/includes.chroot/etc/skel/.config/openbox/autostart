@@ -16,7 +16,7 @@ if [ -r "${wall}" ]; then
 	feh --no-fehbg --bg-fill "${wall}" &
 fi
 
-# lxpanel layout: blue translucency on ISO, opaque black panel on disk installs
+# lxpanel layout: same panel config on live ISO vs disk (templates under /usr/share/gamebian/lxpanel/)
 mkdir -p "${HOME}/.config/lxpanel/default/panels"
 if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	cp -f /usr/share/gamebian/lxpanel/panel-live "${HOME}/.config/lxpanel/default/panels/panel"
