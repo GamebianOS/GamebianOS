@@ -23,6 +23,11 @@ iproute2
 openssh-client
 openssh-server
 vim
+x11-utils
+zenity
+libnotify-bin
+# Desktop notifications without a GNOME/KDE shell (notify-send needs a dbus service)
+xfce4-notifyd
 
 # Icon themes (Papirus is default in skel GTK settings; others available in lxappearance)
 adwaita-icon-theme

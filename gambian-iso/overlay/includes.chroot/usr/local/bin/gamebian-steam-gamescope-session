@@ -1,16 +1,34 @@
 #!/bin/sh
-# LightDM X session: Steam inside gamescope as the whole session (no Openbox / lxpanel).
-# Uses gamescope -e -f on the LightDM-started X server (same stack as gamebian-steam-bigpicture).
-#
-# Until Steam first-boot is finished (~/.config/gamebian-firstboot-steam.done or loginusers.vdf),
-# fall through to Openbox so autostart can run the one-time setup terminal (not this session).
-
-set -eu
+# LightDM X session: Steam Big Picture inside gamescope (no Openbox / lxpanel).
+# Invoked via /etc/X11/Xsession (see xsessions/gamebian-steam-gamescope.desktop).
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
+
+export GAMEBIAN_GAMESCOPE_SESSION=1
+export DESKTOP_SESSION=gamebian-steam-gamescope
+export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
+export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+
+# pam_systemd normally sets this before Xsession runs; ensure it for gamescope/Steam.
+_uid="$(id -u)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "${XDG_RUNTIME_DIR}" ] || [ ! -w "${XDG_RUNTIME_DIR}" ]; then
+	export XDG_RUNTIME_DIR="/run/user/${_uid}"
+	mkdir -p "${XDG_RUNTIME_DIR}" 2>/dev/null || true
+	chmod 700 "${XDG_RUNTIME_DIR}" 2>/dev/null || true
+fi
+
 if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
-	eval "$(dbus-launch --sh-syntax --exit-with-session)" || true
+	if [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+		export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+	elif [ -x /usr/bin/dbus-launch ]; then
+		# shellcheck disable=SC2046
+		eval $(/usr/bin/dbus-launch --sh-syntax --exit-with-session) 2>/dev/null || true
+	fi
 fi
 
 POLKIT_AGENT=""
@@ -27,15 +45,43 @@ if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
 fi
 
-STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
-STEAM_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
+# Optional Vulkan / gamescope tuning (hybrid AMD + NVIDIA NVK laptops). Install-time: /etc/default/gamebian-steam-gamescope.
+if [ -r /etc/default/gamebian-steam-gamescope ]; then
+	set -a
+	# shellcheck disable=SC1091
+	. /etc/default/gamebian-steam-gamescope
+	set +a
+fi
+if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
+	set -a
+	# shellcheck disable=SC1091
+	. "${HOME}/.config/gamebian/steam-gamescope.env"
+	set +a
+fi
 
-# Installed disk only: kiosk after Steam is ready; otherwise Openbox + autostart handles setup.
+# Installed disk: Steam must be installed and kiosk-ready (marker or Debian/Valve loginusers.vdf) before gamescope kiosk.
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	if [ ! -f "${STEAM_ONCE}" ] && [ ! -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
-		exec /usr/bin/openbox-session
+	_steam_once="${HOME}/.config/gamebian-firstboot-steam.done"
+	_steam_data="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
+	_have_steam=0
+	for _c in /usr/games/steam /usr/bin/steam /usr/local/bin/steam; do
+		if [ -x "${_c}" ]; then
+			_have_steam=1
+			break
+		fi
+	done
+	_kiosk_ok=0
+	[ -f "${_steam_once}" ] && _kiosk_ok=1
+	if [ "${_kiosk_ok}" -eq 0 ] && command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
+		_kiosk_ok=1
 	fi
-	if ! command -v steam >/dev/null 2>&1 || ! command -v gamescope >/dev/null 2>&1; then
+	if [ "${_kiosk_ok}" -eq 0 ] && [ -f "${_steam_data}/config/loginusers.vdf" ]; then
+		_kiosk_ok=1
+	fi
+	if [ "${_kiosk_ok}" -eq 0 ] && [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
+		_kiosk_ok=1
+	fi
+	if [ "${_have_steam}" -eq 0 ] || [ "${_kiosk_ok}" -eq 0 ]; then
 		exec /usr/bin/openbox-session
 	fi
 fi

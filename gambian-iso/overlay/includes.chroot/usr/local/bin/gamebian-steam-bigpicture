@@ -1,38 +1,179 @@
 #!/bin/sh
-# Launch Steam Big Picture inside gamescope, nested in an existing Openbox X session.
+# Launch Steam Big Picture inside gamescope on the current X display (LightDM session or nested under Openbox).
 # -e: embed under host X11; -f: fullscreen that window (deck-like; not a small decor window).
-# Quitting Steam exits gamescope and returns to Openbox.
+# Quitting Steam exits gamescope; under Openbox you return to the desktop. Under LightDM’s
+# gamebian-steam-gamescope session you return to the login greeter.
 # Set GAMEBIAN_GAMESCOPE_WINDOWED=1 to drop -f (debug / windowed).
+# Set GAMEBIAN_SKIP_GAMESCOPE=1 to skip gamescope (VMs without Vulkan DRM / llvmpipe).
+# LightDM kiosk: by default gamescope is NOT nested (-e). -e embeds X11 Steam in a desktop window —
+# bare X+kiosk sessions often look like huge black borders + BPM only in one corner unless -W/-H are set.
+# Toggle fullscreen if stuck: Meta/Super+F (gamescope default). Nested Openbox launcher still uses -e.
+# Set GAMEBIAN_GAMESCOPE_KIOSK_EMBED=1 to restore old `gamescope -e …` kiosk behaviour if needed.
+# Optional kiosk output size when not embedding: GAMEBIAN_GAMESCOPE_WH="-W 1920 -H 1200" (match your panel).
+# Hybrid NVIDIA + Mesa NVK: gamescope often fails unless you force another Vulkan ICD or device:
+#   GAMEBIAN_VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json  (colon-separated list ok; name varies — ls icd.d)
+#   GAMEBIAN_GAMESCOPE_EXTRA_ARGS='--prefer-vk-device …'  # run: gamescope --help
+# Optional: GAMEBIAN_GAMESCOPE_DISABLE_WSI=1 → ENABLE_GAMESCOPE_WSI=0 (workaround some NV hybrid hangs).
+# Persist for LightDM kiosk: ~/.config/gamebian/steam-gamescope.env (sourced by gamebian-steam-gamescope-session).
 
-set -eu
+LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/steam-bigpicture.log"
+
+log() {
+	_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
+	_msg="[gamebian-steam-bigpicture] $_ts $*"
+	echo "$_msg" >&2
+	mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+	echo "$_msg" >>"$LOG" 2>/dev/null || true
+}
+
+find_bin() {
+	_name="$1"
+	shift
+	for _c in "$@"; do
+		if [ -n "$_c" ] && [ -x "$_c" ]; then
+			echo "$_c"
+			return 0
+		fi
+	done
+	if command -v "$_name" >/dev/null 2>&1; then
+		command -v "$_name"
+		return 0
+	fi
+	return 1
+}
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
-if ! command -v gamescope >/dev/null 2>&1; then
-	echo "gamebian-steam-bigpicture: gamescope not installed" >&2
-	exit 1
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
 fi
-if ! command -v steam >/dev/null 2>&1; then
-	echo "gamebian-steam-bigpicture: steam not on PATH — finish first-boot Steam setup first" >&2
+
+GAMESCOPE_BIN="$(find_bin gamescope /usr/games/gamescope /usr/bin/gamescope /usr/local/bin/gamescope)" || GAMESCOPE_BIN=""
+STEAM_BIN="$(find_bin steam /usr/games/steam /usr/bin/steam /usr/local/bin/steam)" || STEAM_BIN=""
+
+if [ -z "$STEAM_BIN" ]; then
+	log "steam not on PATH — need first-boot setup"
+	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+		exec /usr/bin/openbox-session
+	fi
 	exit 1
 fi
 
-# Single client: launching again focuses use case "return from desktop".
-if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
-	exit 0
+# Kiosk session needs first-boot marker or an existing Steam login (Debian: loginusers.vdf under ~/.steam/debian-installation/).
+_steam_once="${HOME}/.config/gamebian-firstboot-steam.done"
+_has_login=""
+if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
+	_has_login="1"
+elif [ -f "${HOME}/.local/share/Steam/config/loginusers.vdf" ] || [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
+	_has_login="1"
+fi
+if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
+	&& [ ! -f "${_steam_once}" ] \
+	&& [ -z "${_has_login}" ]; then
+	log "Steam first-boot not finished; switching to Openbox setup"
+	exec /usr/bin/openbox-session
 fi
 
-# Default: modern gamepad UI. Set STEAM_BIGPICTURE_UI=classic for old Big Picture (-bigpicture).
-case "${STEAM_BIGPICTURE_UI:-gamepad}" in
-	classic|bigpicture)
-		STEAM_EXTRA="-bigpicture" ;;
-	*)
-		STEAM_EXTRA="-gamepadui" ;;
+_use_gamescope=1
+case "${GAMEBIAN_SKIP_GAMESCOPE:-}" in
+	1|yes|true|YES|TRUE) _use_gamescope=0 ;;
 esac
+if [ -z "$GAMESCOPE_BIN" ]; then
+	log "gamescope not installed — will start Steam without compositor"
+	_use_gamescope=0
+fi
+
+if [ -n "${GAMEBIAN_VK_ICD_FILENAMES:-}" ]; then
+	_icd_first="${GAMEBIAN_VK_ICD_FILENAMES%%:*}"
+	if [ ! -r "$_icd_first" ]; then
+		log "VK ICD file missing or unreadable: $_icd_first — ls /usr/share/vulkan/icd.d (often radeon_icd.json, not radeon_icd.x86_64.json)"
+	fi
+fi
+
+# Nested under Openbox: skip if Steam is already running (menu / Super+Shift+S relaunch).
+if [ -z "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+	if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
+		exit 0
+	fi
+elif pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
+	pkill -u "$(id -un)" -x steam 2>/dev/null || true
+	sleep 1
+fi
 
 FULLSCREEN="-f"
 case "${GAMEBIAN_GAMESCOPE_WINDOWED:-}" in
 	1|yes|true|YES|TRUE) FULLSCREEN="" ;;
 esac
 
-exec gamescope -e ${FULLSCREEN} -- steam "${STEAM_EXTRA}" "$@"
+# Bare LightDM+Xorg kiosk: omit -e so gamescope runs as full compositor (-W/-H work). Nested desktop: use -e.
+_EMBED_UNDER_X=""
+if [ -z "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+	_EMBED_UNDER_X="-e"
+else
+	case "${GAMEBIAN_GAMESCOPE_KIOSK_EMBED:-}" in
+		1|yes|true|YES|TRUE) _EMBED_UNDER_X="-e" ;;
+	esac
+fi
+
+# Optional explicit kiosk output/game resolution split (gamescope --help; ignored when -e is set).
+_GAMESCOPE_WH=""
+if [ -n "${GAMEBIAN_GAMESCOPE_WH:-}" ]; then
+	_GAMESCOPE_WH="${GAMEBIAN_GAMESCOPE_WH}"
+fi
+
+log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
+
+# Steam UI mode: gamepad (default), classic Big Picture, or plain Steam.
+_steam_modes="-gamepadui -bigpicture"
+case "${STEAM_BIGPICTURE_UI:-gamepad}" in
+	classic|bigpicture) _steam_modes="-bigpicture" ;;
+	plain|desktop) _steam_modes="" ;;
+esac
+
+_run_gamescope() {
+	_steam_args="$1"
+	if [ -n "${GAMEBIAN_VK_ICD_FILENAMES:-}" ]; then
+		export VK_ICD_FILENAMES="${GAMEBIAN_VK_ICD_FILENAMES}"
+	fi
+	case "${GAMEBIAN_GAMESCOPE_DISABLE_WSI:-}" in
+		1|yes|true|YES|TRUE) export ENABLE_GAMESCOPE_WSI=0 ;;
+	esac
+	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN $_steam_args"
+	# shellcheck disable=SC2086
+	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" $_steam_args "$@"
+}
+
+_steam_direct() {
+	_steam_args="$1"
+	log "exec: $STEAM_BIN $_steam_args (no gamescope — VM/llvmpipe or GAMEBIAN_SKIP_GAMESCOPE)"
+	# shellcheck disable=SC2086
+	exec "$STEAM_BIN" $_steam_args "$@"
+}
+
+_launch() {
+	_rc=1
+	if [ "$_use_gamescope" -eq 1 ]; then
+		for _mode in $_steam_modes; do
+			if _run_gamescope "$_mode"; then
+				return 0
+			fi
+			log "gamescope exited $? (common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
+		done
+	fi
+	log "starting Steam without gamescope"
+	for _mode in $_steam_modes; do
+		_steam_direct "$_mode"
+	done
+	return 1
+}
+
+# LightDM kiosk: keep session alive until Steam quits.
+if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+	_launch "$@"
+	exit $?
+fi
+
+# Openbox / menu: try gamescope, fall back to plain Steam on failure.
+_launch "$@"
+exit $?

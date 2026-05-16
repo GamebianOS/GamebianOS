@@ -1,0 +1,14 @@
+#!/bin/sh
+# Run as root. Switched LightDM from post-install Openbox-first (90-) to Steam-in-gamescope kiosk (99-).
+set -eu
+
+LIGHTDM_DROPIN_OPENBOX="/etc/lightdm/lightdm.conf.d/90-gamebian-openbox-first-session.conf"
+LIGHTDM_DROPIN_GAMESCOPE="/etc/lightdm/lightdm.conf.d/99-gamebian-steam-session.conf"
+
+umask 022
+rm -f "$LIGHTDM_DROPIN_OPENBOX"
+
+{
+	printf '%s\n' '[Seat:*]' 'user-session=gamebian-steam-gamescope' 'autologin-session=gamebian-steam-gamescope'
+} >"${LIGHTDM_DROPIN_GAMESCOPE}.tmp" && mv -f "${LIGHTDM_DROPIN_GAMESCOPE}.tmp" "$LIGHTDM_DROPIN_GAMESCOPE"
+chmod 0644 "$LIGHTDM_DROPIN_GAMESCOPE"

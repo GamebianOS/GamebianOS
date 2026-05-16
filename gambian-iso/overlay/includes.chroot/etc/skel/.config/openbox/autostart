@@ -25,6 +25,12 @@ else
 fi
 lxpanel &
 
+# Rofi: light panel on live ISO; installed disk keeps skel default (gamebian dark theme).
+mkdir -p "${HOME}/.config/rofi"
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	printf '%s\n' '@theme "gamebian-live"' > "${HOME}/.config/rofi/config.rasi"
+fi
+
 # PolicyKit UI (must run in the X session before NM secret / control prompts work reliably).
 # Trixie+: policykit-1-gnome is gone; mate-polkit / lxpolkit supply agents.
 POLKIT_AGENT=""
@@ -36,6 +42,11 @@ for _p in /usr/libexec/polkit-gnome-authentication-agent-1 \
 done
 if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
+fi
+
+# Notification daemon for libnotify / notify-send (Steam first-boot, migration path).
+if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
+	xfce4-notifyd >/dev/null 2>&1 &
 fi
 
 # nm-tray after lxpanel: SystemTray must exist before Qt embeds icons (fixes "No Icon set").
@@ -62,22 +73,45 @@ if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	fi
 fi
 
-# Installed disk — two-phase Steam (not live):
-# 1) Until ~/.config/gamebian-firstboot-steam.done: open Steam setup in a terminal once (or skip if Steam
-#    already has a login from a prior run). 2) On every later Openbox start: nested gamescope + Steam UI;
-#    quit Steam to return to the desktop (see /usr/local/bin/gamebian-steam-bigpicture).
-# gamebian-firstboot-steam.prompted: auto-open the setup terminal at most once until done (avoids apt/Steam
-# re-prompt every Openbox login if the window was closed early).
+# Installed disk — Steam first-boot (not live): until ~/.config/gamebian-firstboot-steam.done:
+# optionally open xfce4-terminal with steam-firstboot-terminal.sh once (Steam install/sign-in, then reboot reminder).
+# After first-boot completes, reboot for the fullscreen "Gamebian Steam (gamescope)" session (see LightDM greeter).
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-steam-login-check.sh
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
 STEAM_PROMPTED="${HOME}/.config/gamebian-firstboot-steam.prompted"
 STEAM_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; then
 	if command -v steam >/dev/null 2>&1 && command -v xfce4-terminal >/dev/null 2>&1; then
-		# Already ran Steam and logged in (e.g. outside this script): do not reopen setup every boot.
-		if [ -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
-			mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
-		elif [ ! -f "${STEAM_PROMPTED}" ]; then
+		has_loginusers=""
+		if ( command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf ); then
+			has_loginusers=1
+		elif [ -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
+			has_loginusers=1
+		elif [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
+			has_loginusers=1
+		fi
+		# Already-logged-in (Valve ~/.local/share/Steam or Debian ~/.steam): enable LightDM gamescope session (NOPASSWD for %sudo).
+		if [ "${has_loginusers}" = 1 ] && command -v sudo >/dev/null 2>&1; then
+			if sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
+				mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
+				_rbmsg=$'Steam is already set up.\n\nReboot now for the fullscreen Steam session (optimized with gamescope).'
+				export DISPLAY="${DISPLAY:-:0}"
+				if command -v notify-send >/dev/null 2>&1; then
+					DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}" \
+						notify-send -a Gamebian -u critical "Please reboot" "${_rbmsg}" 2>/dev/null &
+				fi
+				if command -v xmessage >/dev/null 2>&1; then
+					xmessage -center -buttons OK:0 -default OK "${_rbmsg}" >/dev/null 2>&1 &
+				elif command -v zenity >/dev/null 2>&1; then
+					zenity --info --no-wrap --title="Gamebian" --text="${_rbmsg}" >/dev/null 2>&1 &
+				fi
+			fi
+		fi
+		if [ ! -f "${STEAM_ONCE}" ] && [ ! -f "${STEAM_PROMPTED}" ]; then
 			mkdir -p "${HOME}/.config"
 			: > "${STEAM_PROMPTED}"
 			( sleep 2 && xfce4-terminal \
@@ -85,24 +119,15 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
 		fi
 	elif ! command -v steam >/dev/null 2>&1; then
-		# No Steam on target (e.g. offline install) — do not prompt every boot
-		mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
+		# No Steam yet — offer install/setup (do not mark first-boot done)
+		if [ ! -f "${STEAM_PROMPTED}" ]; then
+			mkdir -p "${HOME}/.config"
+			: > "${STEAM_PROMPTED}"
+			( sleep 2 && xfce4-terminal \
+				--title="Install Steam" \
+				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+		fi
 	fi
-fi
-
-# Installed disk: after first-boot marker exists, open Big Picture in nested gamescope each login.
-# Quitting Steam returns to Openbox; relaunch via menu "Steam Big Picture" or Super+Shift+S.
-if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
-	&& [ -f "${STEAM_ONCE}" ] \
-	&& command -v steam >/dev/null 2>&1 \
-	&& command -v gamescope >/dev/null 2>&1 \
-	&& [ -x /usr/local/bin/gamebian-steam-bigpicture ]; then
-	(
-		# Delay so Wi‑Fi passphrase dialogs / PolKit can finish before gamescope grabs the session.
-		sleep 25
-		! pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 || exit 0
-		/usr/local/bin/gamebian-steam-bigpicture
-	) &
 fi
 
 # Calamares only on live session

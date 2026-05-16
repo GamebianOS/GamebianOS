@@ -1,0 +1,9 @@
+#!/bin/sh
+# Debian steam-installer/gamescope install under /usr/games; put names on default PATH.
+set -e
+
+for _bin in gamescope steam; do
+	if [ -x "/usr/games/${_bin}" ] && [ ! -e "/usr/bin/${_bin}" ]; then
+		ln -sf "../games/${_bin}" "/usr/bin/${_bin}"
+	fi
+done

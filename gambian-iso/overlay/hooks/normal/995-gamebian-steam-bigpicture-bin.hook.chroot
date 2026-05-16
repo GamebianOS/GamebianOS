@@ -3,3 +3,5 @@ set -e
 
 chmod 0755 /usr/local/bin/gamebian-steam-bigpicture 2>/dev/null || true
 chmod 0755 /usr/local/bin/gamebian-steam-gamescope-session 2>/dev/null || true
+chmod 0755 /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
+chmod 0440 /etc/sudoers.d/gamebian-enable-steam-session 2>/dev/null || true

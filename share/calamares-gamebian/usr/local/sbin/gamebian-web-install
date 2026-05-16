@@ -150,6 +150,45 @@ pip_run install \
     --prefix=/usr \
     "$SRC_DIR"
 
+# pip on Debian still drops data_files under /usr/local/ even with --prefix=/usr.
+# setup.py installs libexec helpers to .../local/libexec/gamebian/, while .desktop and
+# bin/* wrappers expect /usr/libexec/gamebian/ (ENOENT on "Open Gamebian" etc.).
+fix_gamebian_libexec_shims() {
+    _pip_libexec="/usr/local/libexec/gamebian"
+    _compat="/usr/libexec/gamebian"
+    if [ ! -d "$_pip_libexec" ]; then
+        if [ -e "$_compat/gamebian-web-launcher" ]; then
+            log "libexec already present at $_compat"
+        else
+            log "warning: $_pip_libexec missing — Gamebian launcher paths may be broken"
+        fi
+        return 0
+    fi
+    mkdir -p "$_compat"
+    for _f in "$_pip_libexec"/*; do
+        [ -e "$_f" ] || continue
+        _base="$(basename "$_f")"
+        if [ -e "$_compat/$_base" ] && [ ! -L "$_compat/$_base" ]; then
+            log "warning: $_compat/$_base exists and is not a symlink — leaving in place"
+            continue
+        fi
+        ln -sfn "$_f" "$_compat/$_base"
+    done
+    log "shimmed $_compat/* -> $_pip_libexec (pip local layout)"
+}
+
+fix_gamebian_desktop_system_path() {
+    _src="/usr/local/share/applications/org.gamebianos.app.desktop"
+    _dst="/usr/share/applications/org.gamebianos.app.desktop"
+    if [ -f "$_src" ] && { [ ! -e "$_dst" ] || [ -L "$_dst" ]; }; then
+        ln -sfn "$_src" "$_dst"
+        log "linked $_dst -> $_src"
+    fi
+}
+
+fix_gamebian_libexec_shims
+fix_gamebian_desktop_system_path
+
 fix_gamebian_systemd_units
 run_one_time_fix_script
 
