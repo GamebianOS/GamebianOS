@@ -1,4 +1,9 @@
 # Gamebian Openbox session
+if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-session-log.sh
+	. /usr/share/gamebian/gamebian-session-log.sh
+	gamebian_session_log "openbox-desktop" ""
+fi
 # Live ISO: keep blue branding (GTK via Xsession.d; WM theme swaps here).
 if grep -qw boot=live /proc/cmdline 2>/dev/null \
 	&& grep -q '<name>gamebian-installed</name>' "${HOME}/.config/openbox/rc.xml" 2>/dev/null; then
@@ -16,14 +21,31 @@ if [ -r "${wall}" ]; then
 	feh --no-fehbg --bg-fill "${wall}" &
 fi
 
+# Session env for systray (nm-tray / blueman / Steam). Needed on disk installs before lxpanel embeds applets.
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+export GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}"
+export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-gtk3}"
+export QT_AUTO_SCREEN_SCALE_FACTOR="${QT_AUTO_SCREEN_SCALE_FACTOR:-0}"
+
 # lxpanel layout: same panel config on live ISO vs disk (templates under /usr/share/gamebian/lxpanel/)
 mkdir -p "${HOME}/.config/lxpanel/default/panels"
 if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	cp -f /usr/share/gamebian/lxpanel/panel-live "${HOME}/.config/lxpanel/default/panels/panel"
 else
 	cp -f /usr/share/gamebian/lxpanel/panel-installed "${HOME}/.config/lxpanel/default/panels/panel"
+	# Stale lxpanel from a prior partial session keeps an empty systray on reinstall / first disk boot.
+	pkill -x nm-tray 2>/dev/null || true
+	pkill -f '[b]lueman-applet' 2>/dev/null || true
+	pkill -x lxpanel 2>/dev/null || true
+	sleep 0.3
 fi
 lxpanel &
+
+# nm-tray + blueman + Steam systray: wait for lxpanel tray plugin (see gamebian-lxpanel-tray.sh).
+if [ -x /usr/share/gamebian/gamebian-lxpanel-tray.sh ]; then
+	/usr/share/gamebian/gamebian-lxpanel-tray.sh &
+fi
 
 # Rofi: light panel on live ISO; installed disk keeps skel default (gamebian dark theme).
 mkdir -p "${HOME}/.config/rofi"
@@ -44,19 +66,12 @@ if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
 fi
 
-# Notification daemon for libnotify / notify-send (Steam first-boot, migration path).
+# Notification daemon (must be up before Steam first-boot / openbox-notify scripts run).
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
 	xfce4-notifyd >/dev/null 2>&1 &
-fi
-
-# nm-tray after lxpanel: SystemTray must exist before Qt embeds icons (fixes "No Icon set").
-if command -v nm-tray >/dev/null 2>&1 && ! pgrep -x nm-tray >/dev/null 2>&1; then
-	(sleep 2; env GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}" QT_QPA_PLATFORMTHEME=gtk3 QT_AUTO_SCREEN_SCALE_FACTOR=0 QT_IM_MODULE= nm-tray >/dev/null 2>&1) &
-fi
-
-# Bluetooth systray (GTK — uses GTK_ICON_THEME=Papirus from Xsession.d like other tray icons).
-if command -v blueman-applet >/dev/null 2>&1 && ! pgrep -f '[b]lueman-applet' >/dev/null 2>&1; then
-	(sleep 2; env GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}" blueman-applet >/dev/null 2>&1) &
+	sleep 0.5
 fi
 
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).
@@ -75,10 +90,15 @@ fi
 
 # Installed disk — Steam first-boot (not live): until ~/.config/gamebian-firstboot-steam.done:
 # optionally open xfce4-terminal with steam-firstboot-terminal.sh once (Steam install/sign-in, then reboot reminder).
-# After first-boot completes, reboot for the fullscreen "Gamebian Steam (gamescope)" session (see LightDM greeter).
+# After first-boot completes, reboot for the Steam/Gamescope session (LightDM: Gamebian (steam / openbox)).
 if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
 	# shellcheck source=/usr/share/gamebian/gamebian-steam-login-check.sh
 	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-fix-steam-share.sh
+	. /usr/share/gamebian/gamebian-fix-steam-share.sh
+	gamebian_fix_steam_share
 fi
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
@@ -97,17 +117,11 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 		# Already-logged-in (Valve ~/.local/share/Steam or Debian ~/.steam): enable LightDM gamescope session (NOPASSWD for %sudo).
 		if [ "${has_loginusers}" = 1 ] && command -v sudo >/dev/null 2>&1; then
 			if sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
-				mkdir -p "${HOME}/.config" && : > "${STEAM_ONCE}"
-				_rbmsg=$'Steam is already set up.\n\nReboot now for the fullscreen Steam session (optimized with gamescope).'
-				export DISPLAY="${DISPLAY:-:0}"
-				if command -v notify-send >/dev/null 2>&1; then
-					DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}" \
-						notify-send -a Gamebian -u critical "Please reboot" "${_rbmsg}" 2>/dev/null &
-				fi
-				if command -v xmessage >/dev/null 2>&1; then
-					xmessage -center -buttons OK:0 -default OK "${_rbmsg}" >/dev/null 2>&1 &
-				elif command -v zenity >/dev/null 2>&1; then
-					zenity --info --no-wrap --title="Gamebian" --text="${_rbmsg}" >/dev/null 2>&1 &
+				mkdir -p "${HOME}/.config"
+				: > "${STEAM_ONCE}"
+				touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
+				if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+					/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait &
 				fi
 			fi
 		fi
@@ -128,6 +142,12 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
 		fi
 	fi
+fi
+
+# Installed disk: notify when Steam is idle (reboot + controller + :8844 web tips).
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
+	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+	/usr/share/gamebian/gamebian-openbox-notify.sh &
 fi
 
 # Calamares only on live session

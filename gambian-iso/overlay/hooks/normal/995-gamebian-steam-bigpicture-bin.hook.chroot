@@ -2,6 +2,19 @@
 set -e
 
 chmod 0755 /usr/local/bin/gamebian-steam-bigpicture 2>/dev/null || true
+chmod 0755 /usr/bin/steamos-session-select 2>/dev/null || true
+chmod 0755 /usr/sbin/gamebian-steam-switch-to-desktop 2>/dev/null || true
+chmod 0755 /usr/sbin/gamebian-enable-openbox-lightdm-session 2>/dev/null || true
 chmod 0755 /usr/local/bin/gamebian-steam-gamescope-session 2>/dev/null || true
+chmod 0755 /usr/local/bin/gamebian-lightdm-session 2>/dev/null || true
 chmod 0755 /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
+chmod 0755 /usr/share/gamebian/gamebian-steam-reboot-notice.sh 2>/dev/null || true
+chmod 0755 /usr/share/gamebian/gamebian-openbox-tips-notice.sh 2>/dev/null || true
+chmod 0755 /usr/local/bin/gamebian-debug-boot-session 2>/dev/null || true
+chmod 0755 /usr/local/bin/gamebian-debug-lightdm-steam 2>/dev/null || true
+chmod 0644 /usr/share/gamebian/gamebian-session-log.sh 2>/dev/null || true
+chmod 0755 /usr/share/gamebian/gamebian-openbox-notify.sh 2>/dev/null || true
+chmod 0755 /usr/share/gamebian/gamebian-installed-openbox-notice.sh 2>/dev/null || true
+chmod 0644 /usr/share/gamebian/gamebian-steam-ready.sh 2>/dev/null || true
+chmod 0644 /usr/share/gamebian/xsessions/*.desktop 2>/dev/null || true
 chmod 0440 /etc/sudoers.d/gamebian-enable-steam-session 2>/dev/null || true

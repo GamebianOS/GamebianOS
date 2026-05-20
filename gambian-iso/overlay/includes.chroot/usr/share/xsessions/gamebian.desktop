@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Gamebian
+Comment=Legacy dispatcher — use Desktop or Steam in the greeter
+Exec=/usr/local/bin/gamebian-lightdm-session
+TryExec=/usr/local/bin/gamebian-lightdm-session
+Type=XSession
+DesktopNames=gamebian
+Hidden=true

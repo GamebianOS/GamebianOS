@@ -1,0 +1,3 @@
+#!/bin/sh
+# Alias: LightDM-focused debug for Steam login.
+exec /usr/local/bin/gamebian-debug-boot-session --full "$@"

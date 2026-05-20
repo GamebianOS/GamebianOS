@@ -5,20 +5,11 @@ set +e
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
-_show_reboot_notice() {
-	local msg
-	msg=$'Steam first-time setup is saved.\n\nReboot now for the fullscreen Steam session (optimized with gamescope).'
-	export DISPLAY="${DISPLAY:-:0}"
-
-	if command -v notify-send >/dev/null 2>&1; then
-		DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}" \
-			notify-send -a Gamebian -u critical "Please reboot" "$msg" 2>/dev/null &
-	fi
-
-	if command -v xmessage >/dev/null 2>&1; then
-		xmessage -center -buttons OK:0 -default OK "$msg" >/dev/null 2>&1 &
-	elif command -v zenity >/dev/null 2>&1; then
-		zenity --info --no-wrap --title="Gamebian" --text="$msg" >/dev/null 2>&1 &
+_show_installed_notice() {
+	if [ -x /usr/share/gamebian/gamebian-installed-openbox-notice.sh ]; then
+		/usr/share/gamebian/gamebian-installed-openbox-notice.sh --no-wait
+	elif [ -x /usr/share/gamebian/gamebian-steam-reboot-notice.sh ]; then
+		/usr/share/gamebian/gamebian-steam-reboot-notice.sh
 	fi
 }
 
@@ -70,7 +61,17 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Steam launcher exited with code ${code}."
 echo "Full log may also be at: ~/.steam/steam/logs/console-linux.txt"
 
-read -r -p "$(printf '\nPress Enter when you are finished (enables kiosk session after reboot)... ')"
+mkdir -p "${HOME}/.config"
+touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
+
+export DISPLAY="${DISPLAY:-:0}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+	/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait
+fi
+
+read -r -p "$(printf '\nPress Enter when you are finished (enables Steam session after reboot)... ')"
 
 mkdir -p "${HOME}/.config"
 if ! _enable_steam_lightdm_session; then
@@ -80,8 +81,6 @@ fi
 
 touch "${HOME}/.config/gamebian-firstboot-steam.done"
 echo ""
-echo "Fullscreen Steam session is enabled — reboot once to launch it."
-
-_show_reboot_notice
+echo "Please reboot, then log in with the Steam session (gamescope) at the greeter."
 
 read -r -p "$(printf '\nPress Enter to close this terminal.')" || true

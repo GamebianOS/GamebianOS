@@ -1,0 +1,41 @@
+#!/bin/sh
+# After the main live-build package pass: gamescope (contrib) + libretro-* (non-free).
+# Best-effort only — must never fail the image build (set -e is intentionally omitted).
+export DEBIAN_FRONTEND=noninteractive
+
+if [ -f /usr/share/gamebian/ensure-apt-contrib-nonfree.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+	ensure_apt_contrib_nonfree
+fi
+
+apt-get update -qq || apt-get update || {
+	echo "P: warning: apt-get update failed in 997 hook" >&2
+	exit 0
+}
+
+install_one() {
+	_pkg="$1"
+	for _spec in "${_pkg}:amd64" "$_pkg"; do
+		if apt-get install -y --no-install-recommends "$_spec"; then
+			echo "P: installed $_spec"
+			return 0
+		fi
+	done
+	echo "P: warning: could not install $_pkg (skipped)" >&2
+	return 1
+}
+
+install_one gamescope || true
+
+_list=/usr/share/gamebian/debian-retroarch.list
+if [ -f "$_list" ]; then
+	while read -r _pkg; do
+		case "$_pkg" in ''|\#*) continue ;; esac
+		install_one "$_pkg" || true
+	done <"$_list"
+else
+	echo "P: warning: missing $_list — no libretro cores installed in ISO" >&2
+fi
+
+exit 0

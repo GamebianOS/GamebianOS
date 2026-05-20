@@ -1,0 +1,8 @@
+# Allow USB game controllers to wake the machine from suspend (any button).
+# Requires ACPI/firmware USB wake enabled (most PC firmware: enabled by default).
+
+SUBSYSTEM=="input", ENV{ID_INPUT_JOYSTICK}=="1", ACTION=="add|bind", \
+  RUN+="/usr/libexec/gamebian/enable-usb-wakeup %p"
+
+SUBSYSTEM=="input", ENV{ID_INPUT_GAMEPAD}=="1", ACTION=="add|bind", \
+  RUN+="/usr/libexec/gamebian/enable-usb-wakeup %p"

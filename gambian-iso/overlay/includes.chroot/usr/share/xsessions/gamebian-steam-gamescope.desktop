@@ -1,8 +1,9 @@
 [Desktop Entry]
 Version=1.0
 Name=Gamebian Steam (gamescope)
-Comment=Steam Big Picture in fullscreen gamescope — no Openbox desktop
+Comment=Legacy — use Steam session in the greeter
 Exec=/usr/local/bin/gamebian-steam-gamescope-session
 TryExec=/usr/local/bin/gamebian-steam-gamescope-session
 Type=XSession
 DesktopNames=gamebian-steam-gamescope
+Hidden=true

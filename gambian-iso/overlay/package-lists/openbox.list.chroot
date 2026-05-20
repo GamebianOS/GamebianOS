@@ -51,6 +51,8 @@ lxappearance
 lxappearance-obconf
 # X11 resolution / monitor mode picker (RandR); pairs with Openbox on Gamebian.
 lxrandr
+# xrandr CLI (gamescope kiosk probes native WxH via xrandr)
+x11-xserver-utils
 lxpanel
 rofi
 feh
@@ -65,8 +67,7 @@ pavucontrol
 # i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).
 steam-installer
 steam-devices
-# Nested Big Picture session under Openbox (/usr/local/bin/gamebian-steam-bigpicture uses gamescope -e).
-gamescope
+# gamescope: contrib; installed in 997-gamebian-extra-apt-packages.hook.chroot (not *.list.chroot).
 
 # Installer (removed from disk install via Calamares packages module + autoremove)
 calamares

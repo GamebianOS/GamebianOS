@@ -1,0 +1,5 @@
+#!/bin/sh
+# Calamares: enable contrib + non-free on the target before apt install / gamebian-web.
+set -eu
+. /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+ensure_apt_contrib_nonfree

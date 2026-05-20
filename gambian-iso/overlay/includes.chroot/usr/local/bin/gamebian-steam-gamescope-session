@@ -4,12 +4,27 @@
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
+if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-session-log.sh
+	gamebian_session_log "gamebian-steam-gamescope" "$@"
+fi
+
 if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-login-check.sh
 fi
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
 
 export GAMEBIAN_GAMESCOPE_SESSION=1
+gamebian_kiosk_marker_set 2>/dev/null || true
 export DESKTOP_SESSION=gamebian-steam-gamescope
 export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
 export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
@@ -59,31 +74,46 @@ if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
 	set +a
 fi
 
-# Installed disk: Steam must be installed and kiosk-ready (marker or Debian/Valve loginusers.vdf) before gamescope kiosk.
+# Installed disk: gamescope only when Steam setup is complete (see gamebian-steam-ready.sh).
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	_steam_once="${HOME}/.config/gamebian-firstboot-steam.done"
-	_steam_data="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
+	_log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
+	mkdir -p "$(dirname "$_log")" 2>/dev/null || true
 	_have_steam=0
-	for _c in /usr/games/steam /usr/bin/steam /usr/local/bin/steam; do
-		if [ -x "${_c}" ]; then
-			_have_steam=1
-			break
-		fi
-	done
+	if gamebian_steam_binary_present 2>/dev/null; then
+		_have_steam=1
+	fi
 	_kiosk_ok=0
-	[ -f "${_steam_once}" ] && _kiosk_ok=1
-	if [ "${_kiosk_ok}" -eq 0 ] && command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
-		_kiosk_ok=1
-	fi
-	if [ "${_kiosk_ok}" -eq 0 ] && [ -f "${_steam_data}/config/loginusers.vdf" ]; then
-		_kiosk_ok=1
-	fi
-	if [ "${_kiosk_ok}" -eq 0 ] && [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
+	if gamebian_steam_kiosk_ready 2>/dev/null; then
 		_kiosk_ok=1
 	fi
 	if [ "${_have_steam}" -eq 0 ] || [ "${_kiosk_ok}" -eq 0 ]; then
+		printf '%s gamescope-session: fallback openbox (have_steam=%s kiosk_ready=%s DESKTOP_SESSION=%s)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" \
+			"${_have_steam}" "${_kiosk_ok}" "${DESKTOP_SESSION:-}${XDG_SESSION_DESKTOP:-}" >>"$_log" 2>/dev/null || true
+		if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
+			gamebian_session_log "gamebian-steam-fallback-openbox" "kiosk_ok=${_kiosk_ok}"
+		fi
+		export DISPLAY="${DISPLAY:-:0}"
+		export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
+		if command -v notify-send >/dev/null 2>&1; then
+			notify-send -a Gamebian -u normal "Gamebian Steam" \
+				'Steam is not ready. Log in to Desktop, finish setup, run: gamebian-debug-boot-session' 2>/dev/null &
+		fi
 		exec /usr/bin/openbox-session
 	fi
+	printf '%s gamescope-session: starting kiosk\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
 fi
 
-exec /usr/local/bin/gamebian-steam-bigpicture
+# Do not exec: after bigpicture exits we must hand off to Openbox or LightDM will autologin gamescope again.
+/usr/local/bin/gamebian-steam-bigpicture "$@"
+_rc=$?
+
+if [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
+	rm -f "${GAMEBIAN_SWITCH_OPENBOX}" 2>/dev/null || true
+	gamebian_kiosk_marker_clear 2>/dev/null || true
+	exec /usr/bin/openbox-session
+fi
+
+gamebian_kiosk_marker_clear 2>/dev/null || true
+exit "${_rc}"

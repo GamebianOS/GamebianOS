@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=Steam
+Comment=Steam in fullscreen gamescope (no desktop)
+Exec=/usr/local/bin/gamebian-steam-gamescope-session
+TryExec=/usr/local/bin/gamebian-steam-gamescope-session
+Type=XSession
+DesktopNames=gamebian-steam

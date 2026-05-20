@@ -1,0 +1,45 @@
+#!/bin/sh
+# Steam "Switch to Desktop": in-session handoff to Openbox only (does not change next boot).
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/switch-to-desktop.log"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+
+log() {
+	_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
+	printf '%s %s\n' "$_ts" "$*" >>"$LOG" 2>/dev/null || true
+}
+
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
+
+log "switch-to-desktop (session handoff only; boot session unchanged)"
+
+gamebian_request_switch_to_openbox
+
+if command -v steam >/dev/null 2>&1; then
+	steam -shutdown 2>/dev/null || true
+fi
+
+_i=0
+while [ "${_i}" -lt 20 ]; do
+	if ! pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
+		break
+	fi
+	sleep 0.25
+	_i=$((_i + 1))
+done
+
+pkill -u "$(id -un)" -TERM -x gamescope 2>/dev/null || true
+pkill -u "$(id -un)" -TERM -x steam 2>/dev/null || true
+sleep 0.5
+pkill -u "$(id -un)" -KILL -x gamescope 2>/dev/null || true
+pkill -u "$(id -un)" -KILL -x steam 2>/dev/null || true
+
+log "done flag=$(test -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" && echo set || echo missing)"
+exit 0

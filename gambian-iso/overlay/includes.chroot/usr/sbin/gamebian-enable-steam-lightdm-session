@@ -1,14 +1,32 @@
 #!/bin/sh
-# Run as root. Switched LightDM from post-install Openbox-first (90-) to Steam-in-gamescope kiosk (99-).
+# Prefer Steam (gamescope-only) session on next boot. Must load AFTER 98-gamebian-autologin.conf.
 set -eu
 
-LIGHTDM_DROPIN_OPENBOX="/etc/lightdm/lightdm.conf.d/90-gamebian-openbox-first-session.conf"
-LIGHTDM_DROPIN_GAMESCOPE="/etc/lightdm/lightdm.conf.d/99-gamebian-steam-session.conf"
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
-umask 022
-rm -f "$LIGHTDM_DROPIN_OPENBOX"
+rm -f /etc/lightdm/lightdm.conf.d/90-gamebian-openbox-first-session.conf
+rm -f /etc/lightdm/lightdm.conf.d/99-gamebian-steam-session.conf
+rm -f /etc/lightdm/lightdm.conf.d/88-gamebian-openbox-session.conf
+rm -f /etc/lightdm/lightdm.conf.d/97-gamebian-autologin-steam.conf
 
-{
-	printf '%s\n' '[Seat:*]' 'user-session=gamebian-steam-gamescope' 'autologin-session=gamebian-steam-gamescope'
-} >"${LIGHTDM_DROPIN_GAMESCOPE}.tmp" && mv -f "${LIGHTDM_DROPIN_GAMESCOPE}.tmp" "$LIGHTDM_DROPIN_GAMESCOPE"
-chmod 0644 "$LIGHTDM_DROPIN_GAMESCOPE"
+cat > /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf << 'EOF'
+# Gamebian: autologin Steam (gamescope kiosk). Overrides 98-gamebian-autologin.conf (Desktop).
+[Seat:*]
+user-session=gamebian-steam
+autologin-session=gamebian-steam
+EOF
+chmod 0644 /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf
+
+if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-lightdm-user.sh
+	_home="$(gamebian_lightdm_user_home)" || _home=""
+	if [ -n "${_home}" ]; then
+		_u="$(gamebian_lightdm_autologin_user)"
+		mkdir -p "${_home}/.config/gamebian"
+		rm -f "${_home}/.config/gamebian/prefer-openbox-desktop"
+		[ -n "${_u}" ] && chown -R "${_u}:${_u}" "${_home}/.config/gamebian" 2>/dev/null || true
+	fi
+fi
+
+exit 0

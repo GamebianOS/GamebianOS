@@ -1,0 +1,4 @@
+# RetroArch + libretro cores are NOT installed here (one failed package aborts the whole
+# live-build apt pass). They are installed in hooks/normal/997-gamebian-extra-apt-packages.hook.chroot
+# from /usr/share/gamebian/debian-retroarch.list (best-effort per package).
+# Calamares gamebian-web-install also installs the same list on the target disk.

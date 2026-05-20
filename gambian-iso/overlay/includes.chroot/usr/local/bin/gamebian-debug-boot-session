@@ -1,0 +1,163 @@
+#!/bin/sh
+# Debug LightDM + Steam session login (run on the installed Gamebian system).
+# Usage: gamebian-debug-boot-session [--full]
+set -eu
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+export PATH
+
+_full=0
+[ "${1:-}" = "--full" ] && _full=1
+
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+
+_section() {
+	printf '\n=== %s ===\n' "$1"
+}
+
+_lightdm_grep() {
+	_pattern="$1"
+	if [ -r /var/log/lightdm/lightdm.log ]; then
+		grep -iE "${_pattern}" /var/log/lightdm/lightdm.log 2>/dev/null | tail -n "${2:-40}" || true
+	elif command -v journalctl >/dev/null 2>&1; then
+		journalctl -b -u lightdm --no-pager 2>/dev/null | grep -iE "${_pattern}" | tail -n "${2:-40}" || true
+	else
+		echo "(no lightdm.log — run as root or: sudo journalctl -b -u lightdm)"
+	fi
+}
+
+_section "Gamebian LightDM / Steam session debug"
+echo "time=$(date -Iseconds 2>/dev/null || date)"
+echo "user=$(id -un) uid=$(id -u) home=$HOME"
+echo "cmdline=$(tr ' ' '\n' </proc/cmdline | grep -E '^boot=' || true)"
+echo ""
+
+_section "Effective LightDM session (last value wins per key)"
+if [ -d /etc/lightdm/lightdm.conf.d ]; then
+	ls -1 /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null || true
+	echo "---"
+	_effective_autologin_user=""
+	_effective_autologin_session=""
+	_effective_user_session=""
+	for _f in $(ls -1 /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | sort); do
+		_v="$(grep -E '^autologin-user=' "$_f" 2>/dev/null | tail -n 1 || true)"
+		[ -n "${_v}" ] && _effective_autologin_user="${_v#autologin-user=}"
+		_v="$(grep -E '^autologin-session=' "$_f" 2>/dev/null | tail -n 1 || true)"
+		[ -n "${_v}" ] && _effective_autologin_session="${_v#autologin-session=}"
+		_v="$(grep -E '^user-session=' "$_f" 2>/dev/null | tail -n 1 || true)"
+		[ -n "${_v}" ] && _effective_user_session="${_v#user-session=}"
+	done
+	echo "effective autologin-user=${_effective_autologin_user:-<unset>}"
+	echo "effective autologin-session=${_effective_autologin_session:-<unset>}"
+	echo "effective user-session=${_effective_user_session:-<unset>}"
+else
+	echo "(no /etc/lightdm/lightdm.conf.d)"
+fi
+echo ""
+
+_section "Steam .desktop (what LightDM should exec for gamebian-steam)"
+for _d in /usr/share/gamebian/xsessions/gamebian-steam.desktop \
+	/usr/share/xsessions/gamebian-steam.desktop; do
+	if [ -f "${_d}" ]; then
+		echo "file=${_d}"
+		grep -E '^(Name|Exec|TryExec|DesktopNames)=' "${_d}" || true
+	fi
+done
+if [ -r /etc/lightdm/lightdm.conf.d/99-gamebian-sessions-directory.conf ]; then
+	echo "sessions-directory:"
+	grep sessions-directory /etc/lightdm/lightdm.conf.d/99-gamebian-sessions-directory.conf || true
+fi
+echo ""
+
+_section "First-boot / preference markers"
+for _f in \
+	"${HOME}/.config/gamebian-firstboot-steam.done" \
+	"${HOME}/.config/gamebian-firstboot-steam.run-finished" \
+	"${HOME}/.config/gamebian-firstboot-steam.prompted" \
+	"${HOME}/.config/gamebian/prefer-openbox-desktop"; do
+	if [ -e "${_f}" ]; then
+		echo "  present: ${_f}"
+	else
+		echo "  missing: ${_f}"
+	fi
+done
+echo ""
+
+_section "Would gamebian-steam-gamescope-session start kiosk or fall back to Openbox?"
+echo "  steam binary: $(command -v steam 2>/dev/null || echo no)"
+echo "  kiosk_ready: $(gamebian_steam_kiosk_ready 2>/dev/null && echo yes || echo no)"
+echo "  install_idle: $(gamebian_steam_install_idle 2>/dev/null && echo yes || echo no)"
+echo "  steam busy: $(gamebian_steam_process_busy 2>/dev/null && echo yes || echo no)"
+if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1; then
+	echo "  loginusers.vdf: $(gamebian_have_loginusers_vdf && echo yes || echo no)"
+fi
+if [ "$(gamebian_steam_kiosk_ready 2>/dev/null && echo y)" = "y" ]; then
+	echo "  → Steam session should run gamescope (not Openbox fallback)."
+else
+	echo "  → Steam session will fall back to Openbox until setup markers exist."
+fi
+echo ""
+
+_section "LightDM log: autologin / session selection (recent)"
+_lightdm_grep 'autologin|session|Starting|Started|Failed|gamebian|openbox|Xsession|pam_' 50
+echo ""
+
+_section "LightDM X session log (seat0, recent)"
+if [ -r /var/log/lightdm/x-0.log ]; then
+	tail -n 60 /var/log/lightdm/x-0.log 2>/dev/null || true
+elif [ -r /var/log/lightdm/x-1.log ]; then
+	tail -n 60 /var/log/lightdm/x-1.log 2>/dev/null || true
+else
+	echo "(no /var/log/lightdm/x-*.log — try: sudo tail -60 /var/log/lightdm/x-0.log)"
+fi
+echo ""
+
+_section "Per-user session log (~/.cache/gamebian/lightdm-login.log)"
+if [ -f "${HOME}/.cache/gamebian/lightdm-login.log" ]; then
+	tail -n 80 "${HOME}/.cache/gamebian/lightdm-login.log" 2>/dev/null || true
+else
+	echo "(empty — log in once to Desktop or Steam, then re-run this script)"
+fi
+echo ""
+
+_section "Other Gamebian logs (tail)"
+for _log in \
+	"${HOME}/.cache/gamebian/session.log" \
+	"${HOME}/.cache/gamebian/openbox-notify.log" \
+	"${HOME}/.cache/gamebian/steam-bigpicture.log"; do
+	if [ -f "${_log}" ]; then
+		echo "--- ${_log} ---"
+		tail -n 15 "${_log}" 2>/dev/null || true
+	fi
+done
+echo ""
+
+if [ "${_full}" -eq 1 ]; then
+	_section "Full lightdm.log (last 120 lines) — use sudo if empty"
+	if [ -r /var/log/lightdm/lightdm.log ]; then
+		tail -n 120 /var/log/lightdm/lightdm.log
+	elif command -v sudo >/dev/null 2>&1; then
+		sudo tail -n 120 /var/log/lightdm/lightdm.log 2>/dev/null || true
+	fi
+	echo ""
+	_section "journalctl lightdm (last 80)"
+	journalctl -b -u lightdm --no-pager 2>/dev/null | tail -n 80 || \
+		sudo journalctl -b -u lightdm --no-pager 2>/dev/null | tail -n 80 || true
+fi
+
+_section "Quick fixes"
+echo "Enable Steam autologin (writes 99-gamebian-autologin-steam.conf):"
+echo "  sudo /usr/sbin/gamebian-enable-steam-lightdm-session"
+echo "Revert to Desktop autologin:"
+echo "  sudo /usr/sbin/gamebian-enable-openbox-lightdm-session"
+echo "Capture logs after next login attempt:"
+echo "  sudo tail -f /var/log/lightdm/lightdm.log /var/log/lightdm/x-0.log"
+echo "Full dump:"
+echo "  gamebian-debug-boot-session --full"

@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable USB gamepad wake from suspend
+After=systemd-udev-settle.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/gamebian/enable-usb-wakeup-all
+
+[Install]
+WantedBy=multi-user.target

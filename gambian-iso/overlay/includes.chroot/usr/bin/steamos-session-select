@@ -1,0 +1,27 @@
+#!/bin/sh
+# Steam gamepad / Big Picture session switch (SteamOS API on non-SteamOS distros).
+# "desktop" → Openbox under LightDM; "gamescope" → restore kiosk autologin (optional).
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+_mode="${1:-desktop}"
+
+case "${_mode}" in
+	desktop|openbox|plasma|gnome|xfce)
+		exec /usr/sbin/gamebian-steam-switch-to-desktop
+		;;
+	gamescope|steam|gaming|gamebian-steam-gamescope)
+		if command -v sudo >/dev/null 2>&1 \
+			&& sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
+			:
+		elif command -v sudo >/dev/null 2>&1; then
+			sudo /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
+		fi
+		rm -f "${HOME}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
+		exit 0
+		;;
+	*)
+		exec /usr/sbin/gamebian-steam-switch-to-desktop
+		;;
+esac

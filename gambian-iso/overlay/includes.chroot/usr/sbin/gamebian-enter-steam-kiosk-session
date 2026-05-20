@@ -1,0 +1,101 @@
+#!/bin/sh
+# Fullscreen gamescope + Steam on the current display; next boot uses gamescope (via gamebian-lightdm-session).
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/enter-steam-kiosk.log"
+DISPLAY="${DISPLAY:-:0}"
+export DISPLAY
+export XAUTHORITY="${XAUTHORITY:-${HOME}/.Xauthority}"
+
+log() {
+	_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
+	_msg="[enter-steam-kiosk] $_ts $*"
+	echo "$_msg" >&2
+	mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+	echo "$_msg" >>"$LOG" 2>/dev/null || true
+}
+
+rm -f "${HOME}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
+rm -f "${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
+
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
+
+_enable_lightdm_gamescope() {
+	if [ "$(id -u)" -eq 0 ]; then
+		/usr/sbin/gamebian-enable-steam-lightdm-session
+		return $?
+	fi
+	if command -v sudo >/dev/null 2>&1; then
+		sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null && return 0
+		if [ -t 0 ] && sudo /usr/sbin/gamebian-enable-steam-lightdm-session 2>>"$LOG"; then
+			return 0
+		fi
+		log "warning: sudo could not update boot preference (NOPASSWD?)"
+		return 1
+	fi
+	return 1
+}
+
+_in_exclusive_kiosk() {
+	pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1
+}
+
+log "start DISPLAY=$DISPLAY user=$(id -un)"
+
+if _in_exclusive_kiosk; then
+	log "already in gamescope kiosk"
+	exit 0
+fi
+
+_enable_lightdm_gamescope || true
+touch "${HOME}/.config/gamebian-firstboot-steam.done" 2>/dev/null || true
+
+if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 \
+	|| pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1; then
+	log "stopping prior steam/gamescope"
+	steam -shutdown 2>/dev/null || true
+	sleep 0.5
+	pkill -u "$(id -un)" -TERM -x gamescope 2>/dev/null || true
+	pkill -u "$(id -un)" -TERM -x steam 2>/dev/null || true
+	sleep 0.5
+	pkill -u "$(id -un)" -KILL -x gamescope 2>/dev/null || true
+	pkill -u "$(id -un)" -KILL -x steam 2>/dev/null || true
+fi
+
+if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
+	set -a
+	# shellcheck disable=SC1091
+	. "${HOME}/.config/gamebian/steam-gamescope.env"
+	set +a
+fi
+if [ -r /etc/default/gamebian-steam-gamescope ]; then
+	set -a
+	# shellcheck disable=SC1091
+	. /etc/default/gamebian-steam-gamescope
+	set +a
+fi
+
+export GAMEBIAN_GAMESCOPE_SESSION=1
+export DESKTOP_SESSION=gamebian-steam-gamescope
+export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
+export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+gamebian_kiosk_marker_set 2>/dev/null || true
+
+log "launching gamebian-steam-bigpicture on $DISPLAY"
+if /usr/local/bin/gamebian-steam-bigpicture; then
+	exit 0
+fi
+
+log "gamebian-steam-bigpicture failed — see ${HOME}/.cache/gamebian/steam-bigpicture.log"
+if command -v zenity >/dev/null 2>&1; then
+	zenity --error --title="Gamebian Steam" \
+		--text="Could not start Steam in gamescope.\nSee:\n  ${LOG}\n  ${HOME}/.cache/gamebian/steam-bigpicture.log" \
+		2>/dev/null || true
+fi
+exit 1

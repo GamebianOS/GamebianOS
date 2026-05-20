@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=Desktop
+Comment=Openbox desktop
+Exec=/usr/bin/openbox-session
+TryExec=/usr/bin/openbox-session
+Type=XSession
+DesktopNames=gamebian-desktop

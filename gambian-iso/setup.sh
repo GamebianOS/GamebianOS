@@ -30,7 +30,9 @@ if ! command -v lb >/dev/null 2>&1; then
 fi
 
 # No kernel splash: Plymouth/framebuffer takeover hides printk on tty; GRUB GFX menu stays (bootloaders/splash.png).
+# trixie: full libretro-* set in non-free (Debian testing lacks many cores — see packaging/debian-retroarch.list).
 lb config \
+  --distribution trixie \
   --debootstrap-options "--variant=minbase" \
   --debian-installer none \
   --archive-areas "main contrib non-free non-free-firmware" \
@@ -51,6 +53,23 @@ if [[ -d "$OVERLAY/includes.chroot_before_packages" ]]; then
 fi
 if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
+fi
+
+# APT contrib + non-free helper (libretro-snes9x and other cores).
+ENSURE_APT_SRC="$SCRIPT_ROOT/../share/gamebian/ensure-apt-contrib-nonfree.sh"
+ENSURE_APT_DST="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/ensure-apt-contrib-nonfree.sh"
+if [[ -f "$ENSURE_APT_SRC" ]]; then
+  mkdir -p "$(dirname "$ENSURE_APT_DST")"
+  cp -a "$ENSURE_APT_SRC" "$ENSURE_APT_DST"
+  chmod 0644 "$ENSURE_APT_DST"
+fi
+
+# RetroArch package names for post-install hook + Calamares (not live-build *.list.chroot — see 997 hook).
+RETRO_PKG_SRC="$SCRIPT_ROOT/../../Packages/gamebian-web/packaging/debian-retroarch.list"
+RETRO_PKG_SHARE="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/debian-retroarch.list"
+if [[ -f "$RETRO_PKG_SRC" ]]; then
+  mkdir -p "$(dirname "$RETRO_PKG_SHARE")"
+  cp -a "$RETRO_PKG_SRC" "$RETRO_PKG_SHARE"
 fi
 
 # Controller menu: source lives under Build/share/gamebian/ (same path on ISO as before).
@@ -119,6 +138,12 @@ for _icon in menu-icon.png menu-icon-default.png; do
     cp -a "$SCRIPT_ROOT/design/$_icon" "$GAMEBIAN_PIX/"
   fi
 done
+# Controller quick-launcher header (monochrome icon on installed disk).
+if [[ -f "$GAMEBIAN_PIX/menu-icon-default.png" ]]; then
+  mkdir -p "$BUILD_ROOT/config/includes.chroot/usr/share/gamebian"
+  cp -a "$GAMEBIAN_PIX/menu-icon-default.png" \
+    "$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/controller-menu-icon.png"
+fi
 
 # Stage gamebian-web source into the live filesystem at /usr/src/gamebian-web (from
 # <repo>/Packages/gamebian-web — sibling of Build/, own git checkout).
