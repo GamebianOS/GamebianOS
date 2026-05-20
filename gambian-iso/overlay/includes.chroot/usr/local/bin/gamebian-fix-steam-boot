@@ -1,0 +1,42 @@
+#!/bin/sh
+# Repair Steam/gamescope boot + show what went wrong (run on installed Gamebian).
+set -eu
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+echo "=== gamebian-fix-steam-boot ==="
+
+if [ "$(id -u)" -ne 0 ]; then
+	if command -v sudo >/dev/null 2>&1; then
+		exec sudo -E "$0" "$@"
+	fi
+	echo "Run as root or with sudo." >&2
+	exit 1
+fi
+
+/usr/sbin/gamebian-enable-steam-lightdm-session
+
+_u=""
+if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-lightdm-user.sh
+	_u="$(gamebian_lightdm_autologin_user)"
+	_home="$(gamebian_lightdm_user_home)" || _home=""
+	if [ -n "${_home}" ] && [ -n "${_u}" ]; then
+		mkdir -p "${_home}/.config/gamebian" "${_home}/.config"
+		: >"${_home}/.config/gamebian-firstboot-steam.done"
+		touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
+		chown "${_u}:${_u}" "${_home}/.config/gamebian-firstboot-steam.done" \
+			"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
+		touch "${_home}/.config/gamebian/pending-openbox-notify"
+		chown "${_u}:${_u}" "${_home}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
+		echo "Marked Steam ready for user ${_u}"
+	fi
+fi
+
+echo ""
+echo "LightDM session config:"
+grep -hE '^(autologin-session|user-session|autologin-user)=' /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | sort || true
+echo ""
+echo "Reboot now. Autologin should start gamescope when markers are set."
+echo "If still Openbox, run as your user: gamebian-debug-boot-session --full"

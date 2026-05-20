@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prefer Steam (gamescope-only) session on next boot. Must load AFTER 98-gamebian-autologin.conf.
+# Prefer Steam (gamescope) on next boot; mark first-boot complete for autologin + gamescope.
 set -eu
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
@@ -10,10 +10,9 @@ rm -f /etc/lightdm/lightdm.conf.d/88-gamebian-openbox-session.conf
 rm -f /etc/lightdm/lightdm.conf.d/97-gamebian-autologin-steam.conf
 
 cat > /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf << 'EOF'
-# Gamebian: autologin Steam (gamescope kiosk). Overrides 98-gamebian-autologin.conf (Desktop).
+# Optional: force greeter default to Steam (autologin uses gamebian-autologin-session).
 [Seat:*]
 user-session=gamebian-steam
-autologin-session=gamebian-steam
 EOF
 chmod 0644 /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf
 
@@ -23,9 +22,14 @@ if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 	_home="$(gamebian_lightdm_user_home)" || _home=""
 	if [ -n "${_home}" ]; then
 		_u="$(gamebian_lightdm_autologin_user)"
-		mkdir -p "${_home}/.config/gamebian"
+		mkdir -p "${_home}/.config/gamebian" "${_home}/.config"
 		rm -f "${_home}/.config/gamebian/prefer-openbox-desktop"
-		[ -n "${_u}" ] && chown -R "${_u}:${_u}" "${_home}/.config/gamebian" 2>/dev/null || true
+		: >"${_home}/.config/gamebian-firstboot-steam.done"
+		touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
+		if [ -n "${_u}" ]; then
+			chown -R "${_u}:${_u}" "${_home}/.config/gamebian" "${_home}/.config/gamebian-firstboot-steam.done" \
+				"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
+		fi
 	fi
 fi
 

@@ -3,7 +3,7 @@
 
 GAMEBIAN_KIOSK_MARKER="${HOME}/.config/gamebian/in-gamescope-kiosk-session"
 GAMEBIAN_SWITCH_OPENBOX="${HOME}/.config/gamebian/switch-to-openbox"
-GAMEBIAN_LIGHTDM_GAMESCOPE="/etc/lightdm/lightdm.conf.d/99-gamebian-steam-session.conf"
+GAMEBIAN_LIGHTDM_GAMESCOPE="/etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf"
 
 gamebian_kiosk_marker_set() {
 	mkdir -p "${HOME}/.config/gamebian"
@@ -23,7 +23,7 @@ gamebian_in_steam_kiosk_session() {
 		return 0
 	fi
 	if [ -f "${GAMEBIAN_LIGHTDM_GAMESCOPE}" ] \
-		&& grep -q 'autologin-session=gamebian-steam-gamescope' "${GAMEBIAN_LIGHTDM_GAMESCOPE}" 2>/dev/null; then
+		&& grep -q 'user-session=gamebian-steam' "${GAMEBIAN_LIGHTDM_GAMESCOPE}" 2>/dev/null; then
 		return 0
 	fi
 	if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \

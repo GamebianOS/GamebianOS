@@ -153,10 +153,14 @@ if [ "${_full}" -eq 1 ]; then
 fi
 
 _section "Quick fixes"
-echo "Enable Steam autologin (writes 99-gamebian-autologin-steam.conf):"
+echo "Repair Steam boot + markers (recommended):"
+echo "  sudo gamebian-fix-steam-boot"
+echo "Enable Steam session only:"
 echo "  sudo /usr/sbin/gamebian-enable-steam-lightdm-session"
 echo "Revert to Desktop autologin:"
 echo "  sudo /usr/sbin/gamebian-enable-openbox-lightdm-session"
+echo "Test notifications on this Desktop session:"
+echo "  /usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force"
 echo "Capture logs after next login attempt:"
 echo "  sudo tail -f /var/log/lightdm/lightdm.log /var/log/lightdm/x-0.log"
 echo "Full dump:"

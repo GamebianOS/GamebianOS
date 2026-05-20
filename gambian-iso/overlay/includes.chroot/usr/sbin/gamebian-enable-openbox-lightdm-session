@@ -10,6 +10,17 @@ rm -f /etc/lightdm/lightdm.conf.d/88-gamebian-openbox-session.conf
 rm -f /etc/lightdm/lightdm.conf.d/97-gamebian-autologin-steam.conf
 rm -f /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf
 
+# Greeter default Desktop; autologin still uses gamebian-autologin-session dispatcher.
+if [ -f /etc/lightdm/lightdm.conf.d/98-gamebian-autologin.conf ]; then
+	:
+else
+	cat > /etc/lightdm/lightdm.conf.d/98-gamebian-autologin.conf << 'EOF'
+[Seat:*]
+user-session=gamebian-desktop
+autologin-session=gamebian-autologin
+EOF
+fi
+
 if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-lightdm-user.sh

@@ -1,13 +1,15 @@
 #!/bin/sh
-# LightDM X session: Steam Big Picture inside gamescope (no Openbox / lxpanel).
-# Invoked via /etc/X11/Xsession (see xsessions/gamebian-steam-gamescope.desktop).
+# LightDM Steam session: gamescope + Steam only (no Openbox). Do not fall back when user chose Steam.
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
+# LightDM sets this before Xsession runs (save before we override).
+GAMEBIAN_LIGHTDM_SESSION="${DESKTOP_SESSION:-}${GDMSESSION:-}"
 
 if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-session-log.sh
-	gamebian_session_log "gamebian-steam-gamescope" "$@"
+	gamebian_session_log "gamebian-steam-gamescope" "ldm=${GAMEBIAN_LIGHTDM_SESSION} $*"
 fi
 
 if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
@@ -25,11 +27,10 @@ fi
 
 export GAMEBIAN_GAMESCOPE_SESSION=1
 gamebian_kiosk_marker_set 2>/dev/null || true
-export DESKTOP_SESSION=gamebian-steam-gamescope
-export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
-export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+export DESKTOP_SESSION=gamebian-steam
+export XDG_SESSION_DESKTOP=gamebian-steam
+export XDG_CURRENT_DESKTOP=gamebian-steam
 
-# pam_systemd normally sets this before Xsession runs; ensure it for gamescope/Steam.
 _uid="$(id -u)"
 if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "${XDG_RUNTIME_DIR}" ] || [ ! -w "${XDG_RUNTIME_DIR}" ]; then
 	export XDG_RUNTIME_DIR="/run/user/${_uid}"
@@ -60,7 +61,6 @@ if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
 fi
 
-# Optional Vulkan / gamescope tuning (hybrid AMD + NVIDIA NVK laptops). Install-time: /etc/default/gamebian-steam-gamescope.
 if [ -r /etc/default/gamebian-steam-gamescope ]; then
 	set -a
 	# shellcheck disable=SC1091
@@ -74,38 +74,43 @@ if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
 	set +a
 fi
 
-# Installed disk: gamescope only when Steam setup is complete (see gamebian-steam-ready.sh).
+_force_steam=0
+case "${GAMEBIAN_LIGHTDM_SESSION}" in
+	gamebian-steam|gamebian-steam-gamescope) _force_steam=1 ;;
+esac
+
+_log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
+mkdir -p "$(dirname "$_log")" 2>/dev/null || true
+
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	_log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
-	mkdir -p "$(dirname "$_log")" 2>/dev/null || true
 	_have_steam=0
-	if gamebian_steam_binary_present 2>/dev/null; then
-		_have_steam=1
-	fi
+	gamebian_steam_binary_present 2>/dev/null && _have_steam=1
 	_kiosk_ok=0
-	if gamebian_steam_kiosk_ready 2>/dev/null; then
-		_kiosk_ok=1
-	fi
-	if [ "${_have_steam}" -eq 0 ] || [ "${_kiosk_ok}" -eq 0 ]; then
-		printf '%s gamescope-session: fallback openbox (have_steam=%s kiosk_ready=%s DESKTOP_SESSION=%s)\n' \
-			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" \
-			"${_have_steam}" "${_kiosk_ok}" "${DESKTOP_SESSION:-}${XDG_SESSION_DESKTOP:-}" >>"$_log" 2>/dev/null || true
-		if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
-			gamebian_session_log "gamebian-steam-fallback-openbox" "kiosk_ok=${_kiosk_ok}"
-		fi
-		export DISPLAY="${DISPLAY:-:0}"
-		export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus}"
-		if command -v notify-send >/dev/null 2>&1; then
-			notify-send -a Gamebian -u normal "Gamebian Steam" \
-				'Steam is not ready. Log in to Desktop, finish setup, run: gamebian-debug-boot-session' 2>/dev/null &
-		fi
+	gamebian_steam_kiosk_ready 2>/dev/null && _kiosk_ok=1
+
+	if [ "${_have_steam}" -eq 0 ]; then
+		printf '%s gamescope-session: no steam binary, fallback openbox\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
 		exec /usr/bin/openbox-session
 	fi
-	printf '%s gamescope-session: starting kiosk\n' \
-		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+
+	if [ "${_kiosk_ok}" -eq 0 ] && [ "${_force_steam}" -eq 0 ]; then
+		printf '%s gamescope-session: kiosk not ready, fallback openbox (ldm=%s)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+		export DISPLAY="${DISPLAY:-:0}"
+		touch "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
+		exec /usr/bin/openbox-session
+	fi
+
+	if [ "${_kiosk_ok}" -eq 0 ] && [ "${_force_steam}" -eq 1 ]; then
+		printf '%s gamescope-session: forcing kiosk (ldm=%s kiosk_ok=0)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+	fi
 fi
 
-# Do not exec: after bigpicture exits we must hand off to Openbox or LightDM will autologin gamescope again.
+printf '%s gamescope-session: starting kiosk (ldm=%s force=%s)\n' \
+	"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" "${_force_steam}" >>"$_log" 2>/dev/null || true
+
 /usr/local/bin/gamebian-steam-bigpicture "$@"
 _rc=$?
 

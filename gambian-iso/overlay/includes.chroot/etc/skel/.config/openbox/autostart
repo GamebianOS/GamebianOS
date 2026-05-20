@@ -71,7 +71,13 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
 	xfce4-notifyd >/dev/null 2>&1 &
-	sleep 0.5
+	sleep 1
+fi
+# Queued from steam-firstboot-terminal (terminal dbus may not reach notifyd).
+if [ -f "${HOME}/.config/gamebian/pending-openbox-notify" ] \
+	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+	rm -f "${HOME}/.config/gamebian/pending-openbox-notify"
+	/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force &
 fi
 
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installed Openbox: libnotify only (no dialog). Reboot + controller + gamebian-web tips.
+# Installed Openbox: libnotify only — reboot + controller + gamebian-web (:8844).
 
 export DISPLAY="${DISPLAY:-:0}"
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
@@ -26,25 +26,25 @@ gamebian_notify() {
 		log "sent: ${_title}"
 		return 0
 	fi
-	log "notify-send failed: ${_title}"
+	log "notify-send failed (${DBUS_SESSION_BUS_ADDRESS}): ${_title}"
 	return 1
 }
 
 gamebian_wait_for_notifyd() {
 	_i=0
-	while [ "${_i}" -lt 90 ]; do
+	while [ "${_i}" -lt 120 ]; do
 		if ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
 			if command -v xfce4-notifyd >/dev/null 2>&1; then
 				xfce4-notifyd >/dev/null 2>&1 &
 			fi
 		fi
-		if pgrep -x xfce4-notifyd >/dev/null 2>&1 && [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+		if [ -S "${XDG_RUNTIME_DIR}/bus" ] && pgrep -x xfce4-notifyd >/dev/null 2>&1; then
 			return 0
 		fi
 		sleep 1
 		_i=$((_i + 1))
 	done
-	log "notify daemon not ready after ${_i}s"
+	log "notify daemon not ready (${_i}s) dbus=${DBUS_SESSION_BUS_ADDRESS}"
 	return 1
 }
 
@@ -73,11 +73,16 @@ if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 fi
 
 _no_wait=0
+_force=0
 case "${1:-}" in
 	--no-wait|--now) _no_wait=1 ;;
 esac
+case "${2:-}${1:-}" in
+	--force) _force=1 ;;
+esac
+[ "${1:-}" = "--force" ] && _force=1
 
-log "start DISPLAY=${DISPLAY} user=$(id -un) arg=${1:-}"
+log "start DISPLAY=${DISPLAY} dbus=${DBUS_SESSION_BUS_ADDRESS} arg1=${1:-} arg2=${2:-}"
 
 _wait_for_steam_ready() {
 	_elapsed=0
@@ -88,7 +93,7 @@ _wait_for_steam_ready() {
 			return 0
 		fi
 		if gamebian_steam_process_busy; then
-			log "waiting: steam still busy (${_elapsed}s)"
+			log "waiting: steam busy (${_elapsed}s)"
 		fi
 		sleep 3
 		_elapsed=$((_elapsed + 3))
@@ -102,14 +107,14 @@ if [ "${_no_wait}" -eq 0 ]; then
 fi
 
 if ! gamebian_steam_needs_reboot_notice || ! gamebian_steam_install_idle; then
-	log "skip: kiosk_ready=$(gamebian_steam_kiosk_ready 2>/dev/null; echo $?) idle=$(gamebian_steam_install_idle 2>/dev/null; echo $?)"
+	log "skip: needs_notice=$(gamebian_steam_needs_reboot_notice 2>/dev/null; echo $?) idle=$(gamebian_steam_install_idle 2>/dev/null; echo $?)"
 	exit 0
 fi
 
 gamebian_wait_for_notifyd || true
 
 _sent="${XDG_RUNTIME_DIR}/gamebian-openbox-notify.sent"
-if [ -f "${_sent}" ] && [ "${_no_wait}" -eq 0 ]; then
+if [ -f "${_sent}" ] && [ "${_force}" -eq 0 ] && [ "${_no_wait}" -eq 0 ]; then
 	log "skip: already sent this session"
 	exit 0
 fi
@@ -130,4 +135,5 @@ gamebian_notify "Gamebian controller" "${_ctrl}" normal
 gamebian_notify "Gamebian web" "${_web}" normal
 
 touch "${_sent}" 2>/dev/null || true
+rm -f "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
 log "done"
