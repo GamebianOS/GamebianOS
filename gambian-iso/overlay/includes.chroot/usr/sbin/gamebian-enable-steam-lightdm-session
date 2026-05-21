@@ -10,9 +10,10 @@ rm -f /etc/lightdm/lightdm.conf.d/88-gamebian-openbox-session.conf
 rm -f /etc/lightdm/lightdm.conf.d/97-gamebian-autologin-steam.conf
 
 cat > /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf << 'EOF'
-# Optional: force greeter default to Steam (autologin uses gamebian-autologin-session).
+# Steam enabled: greeter default + marker for gamebian-steam-ready (autologin → gamescope via dispatcher).
 [Seat:*]
 user-session=gamebian-steam
+autologin-session=gamebian-autologin
 EOF
 chmod 0644 /etc/lightdm/lightdm.conf.d/99-gamebian-autologin-steam.conf
 

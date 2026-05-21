@@ -94,21 +94,6 @@ if [ -z "$STEAM_BIN" ]; then
 	exit 1
 fi
 
-# Kiosk session needs first-boot marker or an existing Steam login (Debian: loginusers.vdf under ~/.steam/debian-installation/).
-_steam_once="${HOME}/.config/gamebian-firstboot-steam.done"
-_has_login=""
-if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
-	_has_login="1"
-elif [ -f "${HOME}/.local/share/Steam/config/loginusers.vdf" ] || [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
-	_has_login="1"
-fi
-if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-	&& [ ! -f "${_steam_once}" ] \
-	&& [ -z "${_has_login}" ]; then
-	log "Steam first-boot not finished; switching to Openbox setup"
-	exec /usr/bin/openbox-session
-fi
-
 _use_gamescope=1
 case "${GAMEBIAN_SKIP_GAMESCOPE:-}" in
 	1|yes|true|YES|TRUE) _use_gamescope=0 ;;

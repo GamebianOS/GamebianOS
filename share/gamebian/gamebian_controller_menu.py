@@ -91,6 +91,8 @@ COMMAND_ICON_HINTS: dict[str, str] = {
 THEME_COMMAND_PREFIX = "__gamebian_theme__:"
 DESKTOP_THEME_FILE = Path.home() / ".config" / "gamebian" / "desktop-theme"
 THEME_ICON = "preferences-desktop-theme"
+COLOR_THEME_IDS = frozenset({"green", "yellow", "blue", "red", "black", "purple"})
+INSTALLED_WALLPAPER_DIR = Path("/usr/share/backgrounds/gamebian-installed")
 
 
 def _config_paths() -> list[Path]:
@@ -345,7 +347,14 @@ def discover_user_themes() -> list[tuple[str, str]]:
     return found
 
 
-def _write_gtk3_theme(theme_id: str) -> None:
+def _icon_theme_for_gtk(theme_id: str) -> str:
+    """Dark GTK themes need Papirus-Dark tray icons; bright gamebian/blue/yellow use Papirus."""
+    if theme_id in ("gamebian", "blue", "yellow"):
+        return "Papirus"
+    return "Papirus-Dark"
+
+
+def _write_gtk3_theme(theme_id: str, icon_theme: str | None = None) -> None:
     path = Path.home() / ".config" / "gtk-3.0" / "settings.ini"
     path.parent.mkdir(parents=True, exist_ok=True)
     cfg = configparser.ConfigParser()
@@ -354,25 +363,33 @@ def _write_gtk3_theme(theme_id: str) -> None:
     if not cfg.has_section("Settings"):
         cfg.add_section("Settings")
     cfg.set("Settings", "gtk-theme-name", theme_id)
+    cfg.set("Settings", "gtk-icon-theme-name", icon_theme or _icon_theme_for_gtk(theme_id))
     with path.open("w", encoding="utf-8") as fh:
         cfg.write(fh)
 
 
-def _write_gtk2_theme(theme_id: str) -> None:
+def _write_gtk2_theme(theme_id: str, icon_theme: str | None = None) -> None:
+    _icon = icon_theme or _icon_theme_for_gtk(theme_id)
     path = Path.home() / ".gtkrc-2.0"
     lines: list[str] = []
     if path.is_file():
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     out: list[str] = []
-    replaced = False
+    theme_done = False
+    icon_done = False
     for line in lines:
         if line.strip().startswith("gtk-theme-name"):
             out.append(f'gtk-theme-name = "{theme_id}"')
-            replaced = True
+            theme_done = True
+        elif line.strip().startswith("gtk-icon-theme-name"):
+            out.append(f'gtk-icon-theme-name = "{_icon}"')
+            icon_done = True
         else:
             out.append(line)
-    if not replaced:
+    if not theme_done:
         out.insert(0, f'gtk-theme-name = "{theme_id}"')
+    if not icon_done:
+        out.insert(0, f'gtk-icon-theme-name = "{_icon}"')
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
@@ -394,11 +411,41 @@ def _write_openbox_theme(theme_id: str) -> None:
         rc.write_text(new_text, encoding="utf-8")
 
 
+def _rofi_theme_name(theme_id: str) -> str:
+    if theme_id == "gamebian":
+        return "gamebian-live"
+    if theme_id in COLOR_THEME_IDS:
+        rofi_path = Path.home() / ".local" / "share" / "rofi" / "themes" / f"{theme_id}.rasi"
+        if rofi_path.is_file():
+            return theme_id
+    return "gamebian"
+
+
+def _wallpaper_path(theme_id: str) -> Path | None:
+    if theme_id in COLOR_THEME_IDS:
+        wall = INSTALLED_WALLPAPER_DIR / f"{theme_id}.png"
+        if wall.is_file():
+            return wall
+    if theme_id == "black":
+        for name in ("black.png", "background.png"):
+            wall = INSTALLED_WALLPAPER_DIR / name
+            if wall.is_file():
+                return wall
+    if theme_id == "gamebian-installed":
+        for name in ("background.png", "black.png"):
+            wall = INSTALLED_WALLPAPER_DIR / name
+            if wall.is_file():
+                return wall
+    live = Path.home() / ".local" / "share" / "gamebian" / "background.png"
+    if live.is_file():
+        return live
+    return None
+
+
 def _write_rofi_theme(theme_id: str) -> None:
     rofi_cfg = Path.home() / ".config" / "rofi" / "config.rasi"
-    theme_name = "gamebian-live" if theme_id == "gamebian" else "gamebian"
     rofi_cfg.parent.mkdir(parents=True, exist_ok=True)
-    rofi_cfg.write_text(f'@theme "{theme_name}"\n', encoding="utf-8")
+    rofi_cfg.write_text(f'@theme "{_rofi_theme_name(theme_id)}"\n', encoding="utf-8")
 
 
 def _persist_desktop_theme(theme_id: str) -> None:
@@ -407,11 +454,8 @@ def _persist_desktop_theme(theme_id: str) -> None:
 
 
 def _refresh_wallpaper(theme_id: str, env: dict[str, str]) -> None:
-    if theme_id in ("gamebian-installed", "black"):
-        wall = Path("/usr/share/backgrounds/gamebian-installed/background.png")
-    else:
-        wall = Path.home() / ".local" / "share" / "gamebian" / "background.png"
-    if not wall.is_file():
+    wall = _wallpaper_path(theme_id)
+    if wall is None or not wall.is_file():
         return
     try:
         subprocess.Popen(

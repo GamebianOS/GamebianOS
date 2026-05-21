@@ -63,32 +63,6 @@ gamebian_steam_kiosk_ready() {
 	gamebian_have_loginusers_vdf
 }
 
-# Something in first-boot / Steam setup warrants the reboot notice.
-gamebian_reboot_notice_eligible() {
-	gamebian_firstboot_done && return 0
-	[ -f "${HOME}/.config/gamebian-firstboot-steam.run-finished" ] && return 0
-	[ -f "${HOME}/.config/gamebian/pending-openbox-notify" ] && return 0
-	gamebian_steam_session_enabled && return 0
-	gamebian_have_loginusers_vdf && return 0
-	return 1
-}
-
-# Ready to show reboot notice now (do not wait for Steam to quit on login screen).
-gamebian_reboot_notice_ready_to_show() {
-	[ "${1:-0}" = "1" ] && return 0
-	gamebian_reboot_notice_eligible || return 1
-	gamebian_firstboot_done && return 0
-	[ -f "${HOME}/.config/gamebian-firstboot-steam.run-finished" ] && return 0
-	[ -f "${HOME}/.config/gamebian/pending-openbox-notify" ] && return 0
-	gamebian_steam_session_enabled && return 0
-	gamebian_have_loginusers_vdf && return 0
-	gamebian_steam_install_idle
-}
-
-gamebian_steam_needs_reboot_notice() {
-	gamebian_reboot_notice_eligible
-}
-
 gamebian_steam_install_idle() {
 	! gamebian_steam_process_busy
 }
@@ -112,47 +86,3 @@ gamebian_use_steam_without_gamescope() {
 		|| ! gamebian_gamescope_binary_works
 }
 
-gamebian_queue_reboot_notify() {
-	mkdir -p "${HOME}/.config/gamebian" "${HOME}/.cache/gamebian"
-	touch "${HOME}/.config/gamebian/pending-openbox-notify"
-	if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-		gamebian_export_session_env
-		/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force \
-			>>"${HOME}/.cache/gamebian/openbox-notify.log" 2>&1 &
-	fi
-}
-
-# After Steam sign-in: enable LightDM Steam session, set markers, show reboot notice.
-gamebian_on_steam_signed_in() {
-	gamebian_firstboot_done && return 0
-	gamebian_have_loginusers_vdf || return 1
-
-	_enabled=0
-	if command -v sudo >/dev/null 2>&1 \
-		&& sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
-		mkdir -p "${HOME}/.config"
-		: >"${HOME}/.config/gamebian-firstboot-steam.done"
-		touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
-		_enabled=1
-	fi
-
-	# Show reboot notice as soon as Steam account data exists (even if Steam is still on the login UI).
-	gamebian_queue_reboot_notify
-	[ "${_enabled}" -eq 1 ] && return 0
-	return 1
-}
-
-# Background poll while Steam is on the login screen (Openbox autostart).
-gamebian_poll_steam_signin_then_notify() {
-	gamebian_export_session_env
-	_poll=0
-	while [ "${_poll}" -lt 120 ]; do
-		gamebian_firstboot_done && break
-		if gamebian_have_loginusers_vdf; then
-			gamebian_on_steam_signed_in || true
-			break
-		fi
-		sleep 5
-		_poll=$((_poll + 1))
-	done
-}

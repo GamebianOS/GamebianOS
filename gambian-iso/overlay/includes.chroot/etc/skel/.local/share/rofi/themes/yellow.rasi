@@ -1,0 +1,87 @@
+/**
+ * Rofi — Gamebian yellow (#f89917)
+ */
+
+* {
+    text-color: #1a1a1a;
+    background-color: rgba(0,0,0,0);
+    dark: #da8614;
+    black: #da8614;
+    lightblack: #da8614;
+    red: #f89917;
+    lightred: #f9b557;
+    green: #f89917;
+    lightgreen: #f9b557;
+    yellow: #f89917;
+    lightyellow: #f9b557;
+    blue: #f89917;
+    lightblue: #f9b557;
+    magenta: #f89917;
+    lightmagenta: #f9b557;
+    cyan: #f9b557;
+    lightcyan: #f9b557;
+    white: #b26e10;
+    lightwhite: #1a1a1a;
+    highlight: bold #f9b557;
+}
+window {
+    height: 90%;
+    width: 30em;
+    location: west;
+    anchor: west;
+    border: 0px 2px 0px 0px;
+    text-color: @lightwhite;
+}
+mode-switcher {
+    border: 2px 0px 0px 0px;
+    background-color: @lightblack;
+    padding: 4px;
+}
+button selected {
+    border-color: @lightgreen;
+    text-color: @lightgreen;
+}
+inputbar {
+    background-color: @lightblack;
+    text-color: @lightgreen;
+    padding: 4px;
+    border: 0px 0px 2px 0px;
+}
+mainbox {
+    expand: true;
+    background-color: rgba(248,153,23,0.9);
+    spacing: 1em;
+}
+listview {
+    padding: 0em 0.4em 0em 1em;
+    dynamic: false;
+    lines: 0;
+}
+element-text {
+    background-color: inherit;
+    text-color: inherit;
+}
+element selected normal {
+    background-color: @blue;
+}
+element normal active {
+    text-color: @lightblue;
+}
+element normal urgent {
+    text-color: @lightred;
+}
+element selected active {
+    background-color: @lightblue;
+    text-color: #1a1a1a;
+}
+element selected urgent {
+    background-color: @lightred;
+    text-color: #1a1a1a;
+}
+error-message {
+    expand: true;
+    background-color: @red;
+    border-color: @dark;
+    border: 2px;
+    padding: 1em;
+}

@@ -1,6 +1,5 @@
 #!/bin/sh
-# LightDM autologin dispatcher: Openbox for first-boot / live, else gamescope kiosk.
-# Switch to Desktop only hands off inside the current session (does not change the next boot).
+# Legacy LightDM session (gamebian.desktop). Same routing as gamebian-autologin-session.
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
@@ -9,31 +8,17 @@ if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	exec /usr/bin/openbox-session
 fi
 
-PREFER="${HOME}/.config/gamebian/prefer-openbox-desktop"
-ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
-
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
 fi
 
-# Explicit “always boot to Openbox” (optional; not set by Switch to Desktop).
-if [ -f "${PREFER}" ]; then
+if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
 	exec /usr/bin/openbox-session
 fi
 
-# First-boot: Openbox until Steam setup marker or Valve/Debian loginusers.vdf exists.
-if [ ! -f "${ONCE}" ]; then
-	_has_login=""
-	if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
-		_has_login=1
-	elif [ -f "${HOME}/.local/share/Steam/config/loginusers.vdf" ] \
-		|| [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
-		_has_login=1
-	fi
-	if [ -z "${_has_login}" ]; then
-		exec /usr/bin/openbox-session
-	fi
+if gamebian_steam_binary_present 2>/dev/null; then
+	exec /usr/local/bin/gamebian-steam-gamescope-session
 fi
 
-exec /usr/local/bin/gamebian-steam-gamescope-session
+exec /usr/bin/openbox-session

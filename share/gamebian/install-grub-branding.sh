@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Copy Gamebian GRUB artwork into live-build bootloaders + chroot branding paths.
-# Sources: Build/gambian-iso/design/installed-bakgrounds/ (or design/grub-16x9.png fallback).
+# Sources: Build/gambian-iso/design/installed-backgrounds/ (or design/grub-16x9.png fallback).
 set -euo pipefail
 
 _here="$(cd "$(dirname "$0")" && pwd)"
 ISO_ROOT="$(cd "$_here/../../gambian-iso" && pwd)"
 OVERLAY="$ISO_ROOT/overlay"
-DESIGN_INST="$ISO_ROOT/design/installed-bakgrounds"
+DESIGN_INST="$ISO_ROOT/design/installed-backgrounds"
 DESIGN_TOP="$ISO_ROOT/design"
 
 pick_grub_16x9() {

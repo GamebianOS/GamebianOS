@@ -1,17 +1,17 @@
-/* Gamebian theme: purple (#6e01a8) */
+/* Gamebian theme: purple (#340e39) */
 
-@define-color theme_bg_color #6e01a8;
+@define-color theme_bg_color #340e39;
 @define-color theme_fg_color #ffffff;
 @define-color theme_text_color #ffffff;
 @define-color theme_base_color #1e1e28;
-@define-color theme_view_hover_color #600093;
-@define-color theme_selected_bg_color #7915ae;
+@define-color theme_view_hover_color #2d0c32;
+@define-color theme_selected_bg_color #442148;
 @define-color theme_selected_fg_color #ffffff;
-@define-color insensitive_bg_color #550083;
-@define-color insensitive_fg_color #af73cf;
-@define-color borders #550083;
+@define-color insensitive_bg_color #280a2c;
+@define-color insensitive_fg_color #8f7a92;
+@define-color borders #280a2c;
 @define-color wm_title #ffffff;
-@define-color wm_unfocused_title #af73cf;
+@define-color wm_unfocused_title #8f7a92;
 
 .background,
 window.background {

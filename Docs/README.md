@@ -2,7 +2,7 @@
 
 Short descriptions of Gamebian overlay scripts under `Build/gambian-iso/overlay/includes.chroot/`. These files are copied into the live ISO squashfs and onto disk after Calamares install.
 
-For the full boot → Openbox → Steam first-boot → gamescope flow, see [STEAM-BOOT-AND-SESSIONS.md](../gambian-iso/docs/STEAM-BOOT-AND-SESSIONS.md). For gamescope/apt on trixie, see [DEBIAN-STEAM-GAMESCOPE.md](../gambian-iso/docs/DEBIAN-STEAM-GAMESCOPE.md).
+For the full boot → gamescope (or live Openbox) flow, see [STEAM-BOOT-AND-SESSIONS.md](../gambian-iso/docs/STEAM-BOOT-AND-SESSIONS.md). For gamescope/apt on trixie, see [DEBIAN-STEAM-GAMESCOPE.md](../gambian-iso/docs/DEBIAN-STEAM-GAMESCOPE.md).
 
 **Live USB GRUB** uses the same `grub-16x9.png` as installed systems (`overlay/bootloaders/grub-pc|efi/splash.png`, title “Welcome to Gamebian”). Refresh assets with `Build/share/gamebian/install-grub-branding.sh` (also run from `setup.sh`).
 
@@ -14,7 +14,7 @@ Paths below are **on the image** (overlay paths omit `Build/gambian-iso/overlay/
 
 | Path | Description |
 |------|-------------|
-| `/usr/local/bin/gamebian-autologin-session` | **Main autologin dispatcher.** Live ISO (`boot=live`) → Openbox. Installed disk → Openbox until Steam first-boot is complete, then gamescope. |
+| `/usr/local/bin/gamebian-autologin-session` | **Main autologin dispatcher.** Live ISO → Openbox. Installed + Steam → **gamescope** (Desktop only via greeter or `prefer-openbox-desktop`). |
 | `/usr/local/bin/gamebian-lightdm-session` | **Legacy** hidden dispatcher (similar rules, not used for normal autologin). |
 | `/usr/local/bin/gamebian-steam-gamescope-session` | LightDM **Steam** session: kiosk env, polkit agent, then `gamebian-steam-bigpicture`. |
 | `/usr/local/bin/gamebian-steam-bigpicture` | Runs gamescope + Steam (`-gamepadui`, `-steamos3`); Openbox fallback; “Switch to Desktop” handoff. |
@@ -30,7 +30,7 @@ Paths below are **on the image** (overlay paths omit `Build/gambian-iso/overlay/
 
 | Path | Description |
 |------|-------------|
-| `/usr/local/bin/gamebian-controller-menu` | Quick launcher (Super, Guide / Home, Select+Start); theme switcher (`~/.themes`: gamebian, gamebian-installed, green, yellow, blue, red, black, purple). |
+| `/usr/local/bin/gamebian-controller-menu` | Quick launcher (Super, Guide / Home, Select+Start); theme switcher (GTK/Openbox/rofi + `green.png`… wallpapers from branding palette). |
 | `/usr/local/bin/gamebian-debug-boot-session` | Prints LightDM config, markers, gamescope status, logs; repair hints. |
 | `/usr/local/bin/gamebian-debug-lightdm-steam` | Alias for `gamebian-debug-boot-session --full`. |
 | `/usr/local/bin/gamebian-fix-steam-boot` | **Root repair:** enable Steam session, set markers, queue reboot notify. |
@@ -58,7 +58,7 @@ Sourced by session scripts, Openbox autostart, and installers — not usually ru
 | `/usr/share/gamebian/gamebian-apt-unmix-sid.sh` | Stash sid pins/sources; align `libgpg-error0` amd64/i386 for Steam after gamescope install. |
 | `/usr/share/gamebian/gamebian-fix-steam-share.sh` | Symlink `~/.local/share/Steam` → `~/.steam/debian-installation`. |
 | `/usr/share/gamebian/gamebian-lightdm-user.sh` | Resolve autologin username and home (root enable-* scripts). |
-| `/usr/share/gamebian/gamebian-steam-ready.sh` | Markers, sign-in poll, `gamebian_queue_reboot_notify`, `gamebian_reboot_notice_ready_to_show` (no idle wait on login screen). |
+| `/usr/share/gamebian/gamebian-steam-ready.sh` | Markers, `gamebian_steam_binary_present`, `gamebian_steam_kiosk_ready`, loginusers helpers. |
 | `/usr/share/gamebian/gamebian-steam-kiosk-env.sh` | Kiosk marker, in-gamescope detection, `switch-to-openbox` flag. |
 | `/usr/share/gamebian/gamebian-session-log.sh` | Append to `~/.cache/gamebian/lightdm-login.log`. |
 
@@ -68,8 +68,8 @@ Sourced by session scripts, Openbox autostart, and installers — not usually ru
 
 | Path | Description |
 |------|-------------|
-| `/usr/share/gamebian/steam-firstboot-terminal.sh` | First-boot wizard: install/run Steam, enable LightDM Steam session, reboot notifications. |
-| `/usr/share/gamebian/gamebian-openbox-notify.sh` | Reboot for gamescope (`--force` skips Steam-idle wait), controller + web tips; zenity/xmessage fallback. |
+| `/usr/share/gamebian/steam-firstboot-terminal.sh` | Before Steam is installed: install/run Steam, enable LightDM Steam session. |
+| `/usr/share/gamebian/gamebian-openbox-notify.sh` | Desktop-only tips (welcome, logout→Steam, localhost:8844); skipped once `steam` is installed. |
 | `/usr/share/gamebian/gamebian-lxpanel-tray.sh` | Fast systray poll (100ms); NM + nm-tray in parallel; quick embed retries (no 8s delay). |
 
 ---
@@ -89,10 +89,9 @@ Sourced by session scripts, Openbox autostart, and installers — not usually ru
 ```text
 LightDM autologin
   → gamebian-autologin-session
-       → openbox-session (live / first-boot)
-            → autostart → steam-firstboot-terminal.sh
-            → gamebian-openbox-notify.sh (reboot when ready)
-       → gamebian-steam-gamescope-session (after reboot + markers)
+       → openbox-session (live ISO only)
+       → gamebian-steam-gamescope-session (installed + Steam)
+            → gamebian-steam-bigpicture (gamescope + Steam)
             → gamebian-steam-bigpicture
                  → gamescope + steam
 ```
@@ -108,7 +107,7 @@ gamebian-debug-boot-session          # why am I on Openbox vs Steam?
 sudo gamebian-fix-steam-boot         # repair LightDM + markers
 sudo gamebian-install-gamescope      # missing gamescope
 sudo gamebian-install-steam          # missing steam-installer
-/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force   # show reboot notice now
+/usr/share/gamebian/gamebian-openbox-notify.sh   # desktop tips (before Steam package only)
 ```
 
 **Logs:** `~/.cache/gamebian/session.log`, `steam-bigpicture.log`, `openbox-notify.log`, `/var/log/gamebian-install-gamescope.log`

@@ -28,8 +28,6 @@ if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 		touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
 		chown "${_u}:${_u}" "${_home}/.config/gamebian-firstboot-steam.done" \
 			"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
-		touch "${_home}/.config/gamebian/pending-openbox-notify"
-		chown "${_u}:${_u}" "${_home}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
 		echo "Marked Steam ready for user ${_u}"
 	fi
 fi

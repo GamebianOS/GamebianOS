@@ -1,15 +1,15 @@
-/* Gamebian theme: yellow (#f2ae01) */
+/* Gamebian theme: yellow (#f89917) */
 
-@define-color theme_bg_color #f2ae01;
+@define-color theme_bg_color #f89917;
 @define-color theme_fg_color #1a1a1a;
 @define-color theme_text_color #1a1a1a;
 @define-color theme_base_color #fff8e6;
-@define-color theme_view_hover_color #d49900;
-@define-color theme_selected_bg_color #dea000;
+@define-color theme_view_hover_color #da8614;
+@define-color theme_selected_bg_color #e48c15;
 @define-color theme_selected_fg_color #1a1a1a;
-@define-color insensitive_bg_color #bc8700;
+@define-color insensitive_bg_color #c17711;
 @define-color insensitive_fg_color #6a5a30;
-@define-color borders #bc8700;
+@define-color borders #c17711;
 @define-color wm_title #1a1a1a;
 @define-color wm_unfocused_title #6a5a30;
 

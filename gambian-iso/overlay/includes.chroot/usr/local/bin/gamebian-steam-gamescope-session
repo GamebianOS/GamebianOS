@@ -79,11 +79,15 @@ esac
 _log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
 mkdir -p "$(dirname "$_log")" 2>/dev/null || true
 
+if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
+	printf '%s gamescope-session: prefer-openbox-desktop → openbox\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+	exec /usr/bin/openbox-session
+fi
+
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	_have_steam=0
 	gamebian_steam_binary_present 2>/dev/null && _have_steam=1
-	_kiosk_ok=0
-	gamebian_steam_kiosk_ready 2>/dev/null && _kiosk_ok=1
 
 	if [ "${_have_steam}" -eq 0 ]; then
 		printf '%s gamescope-session: no steam binary, fallback openbox\n' \
@@ -91,18 +95,10 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 		exec /usr/bin/openbox-session
 	fi
 
-	if [ "${_kiosk_ok}" -eq 0 ] && [ "${_force_steam}" -eq 0 ]; then
-		printf '%s gamescope-session: kiosk not ready, fallback openbox (ldm=%s)\n' \
-			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
-		export DISPLAY="${DISPLAY:-:0}"
-		touch "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
-		exec /usr/bin/openbox-session
-	fi
-
-	if [ "${_kiosk_ok}" -eq 0 ] && [ "${_force_steam}" -eq 1 ]; then
-		printf '%s gamescope-session: forcing kiosk (ldm=%s kiosk_ok=0)\n' \
-			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
-	fi
+	# Steam is installed: always run gamescope kiosk (sign-in / updates happen in Steam UI).
+	_force_steam=1
+	printf '%s gamescope-session: steam installed — kiosk (ldm=%s)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
 fi
 
 if gamebian_use_steam_without_gamescope 2>/dev/null; then

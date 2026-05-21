@@ -1,6 +1,6 @@
 #!/bin/sh
-# Installed Openbox: libnotify — reboot for gamescope, controller menu, gamebian-web (:8844).
-# Usage: gamebian-openbox-notify.sh [--no-wait] [--force]
+# Installed Openbox (Desktop session): welcome + Steam logout + gamebian-web tips.
+# Only while Steam is not installed; after steam-installer is on disk this script exits immediately.
 
 export DISPLAY="${DISPLAY:-:0}"
 _uid="$(id -u)"
@@ -16,7 +16,7 @@ else
 fi
 
 LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/openbox-notify.log"
-mkdir -p "$(dirname "$LOG")" "${HOME}/.config/gamebian" 2>/dev/null || true
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 
 log() {
 	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "$*" >>"$LOG" 2>/dev/null || true
@@ -24,7 +24,7 @@ log() {
 
 gamebian_ensure_notifyd() {
 	_i=0
-	while [ "${_i}" -lt 120 ]; do
+	while [ "${_i}" -lt 60 ]; do
 		if ! pgrep -u "$(id -un)" -x xfce4-notifyd >/dev/null 2>&1; then
 			command -v xfce4-notifyd >/dev/null 2>&1 \
 				&& xfce4-notifyd >>"$LOG" 2>&1 &
@@ -35,7 +35,7 @@ gamebian_ensure_notifyd() {
 		sleep 1
 		_i=$((_i + 1))
 	done
-	log "notify daemon not ready (${_i}s) dbus=${DBUS_SESSION_BUS_ADDRESS}"
+	log "notify daemon not ready (${_i}s)"
 	return 1
 }
 
@@ -47,34 +47,12 @@ gamebian_notify() {
 		log "notify-send missing: ${_title}"
 		return 1
 	fi
-	if notify-send -a Gamebian -u "${_urgency}" -t 30000 "${_title}" "${_body}" 2>>"$LOG"; then
+	if notify-send -a Gamebian -u "${_urgency}" -t 45000 "${_title}" "${_body}" 2>>"$LOG"; then
 		log "sent: ${_title}"
 		return 0
 	fi
-	log "notify-send failed (${DBUS_SESSION_BUS_ADDRESS}): ${_title}"
+	log "notify-send failed: ${_title}"
 	return 1
-}
-
-gamebian_notify_reboot_critical() {
-	_msg="$1"
-	_ok=0
-	gamebian_ensure_notifyd || true
-	if gamebian_notify "Welcome to Gamebian! [Desktop session]" "${_msg}" critical; then
-		_ok=1
-	fi
-	if [ "${_ok}" -eq 0 ] && command -v zenity >/dev/null 2>&1; then
-		if zenity --info --title="Gamebian Steam" --width=440 --text="${_msg}" 2>>"$LOG"; then
-			log "zenity reboot notice shown"
-			_ok=1
-		fi
-	fi
-	if [ "${_ok}" -eq 0 ] && command -v xmessage >/dev/null 2>&1; then
-		if xmessage -center -buttons "OK:0" -default ok -title "Gamebian Steam" "${_msg}" 2>>"$LOG"; then
-			log "xmessage reboot notice shown"
-			_ok=1
-		fi
-	fi
-	[ "${_ok}" -eq 1 ]
 }
 
 gamebian_primary_ip() {
@@ -88,86 +66,35 @@ gamebian_primary_ip() {
 	printf '%s' "${_ip}"
 }
 
-gamebian_show_openbox_notices() {
-	_reboot_msg='Please reboot or logout and select "Steam" to continue your Steam/Gamescope session.'
-	_reboot_ok=0
-	if gamebian_notify_reboot_critical "${_reboot_msg}"; then
-		_reboot_ok=1
-	else
-		log "reboot notice failed; leaving pending-openbox-notify"
-		touch "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
-	fi
+gamebian_show_desktop_welcome_notices() {
+	gamebian_ensure_notifyd || true
+
+	gamebian_notify "Welcome to the Gamebian desktop" \
+		"You are in the Desktop (Openbox) session. Install and sign in to Steam here if needed." \
+		normal
+
+	gamebian_notify "Steam session" \
+		'When Steam is ready, logout and choose "Steam" at the login screen (or reboot) for the gamescope kiosk.' \
+		normal
 
 	_ip="$(gamebian_primary_ip)"
-	_ctrl='Press Home (Guide / Mode) on your controller to open the Gamebian quick-launcher menu.'
-	if [ -n "${_ip}" ]; then
-		_web=$(printf 'Open http://%s:8844 in a browser to install games, third-party storefronts, and Flatpak images.' "${_ip}")
+	if [ -n "${_ip}" ] && [ "${_ip}" != "127.0.0.1" ]; then
+		_web="Open http://127.0.0.1:8844 or http://${_ip}:8844 in a browser to install games, storefronts, and Flatpak images."
 	else
-		_web='Open http://<this computer'\''s IP>:8844 in a browser to install games, third-party storefronts, and Flatpak images.'
+		_web='Open http://127.0.0.1:8844 in a browser to install games, storefronts, and Flatpak images.'
 	fi
-	gamebian_ensure_notifyd || true
-	gamebian_notify "Gamebian controller" "${_ctrl}" normal
 	gamebian_notify "Gamebian web" "${_web}" normal
-
-	if [ "${_reboot_ok}" -eq 1 ]; then
-		touch "${XDG_RUNTIME_DIR}/gamebian-openbox-notify.sent" 2>/dev/null || true
-		rm -f "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
-	fi
-	return "${_reboot_ok}"
 }
 
-# --- main (when executed, not sourced) ---
+# --- main ---
 grep -qw boot=live /proc/cmdline 2>/dev/null && exit 0
 
-_no_wait=0
-_force=0
-for _arg in "$@"; do
-	case "${_arg}" in
-		--no-wait|--now) _no_wait=1 ;;
-		--force) _force=1 ;;
-	esac
-done
-
-log "start DISPLAY=${DISPLAY} dbus=${DBUS_SESSION_BUS_ADDRESS} args=$* force=${_force}"
-
-_gamebian_reboot_notice_ready() {
-	if [ "${_force}" -eq 1 ]; then
-		return 0
-	fi
-	if command -v gamebian_reboot_notice_ready_to_show >/dev/null 2>&1; then
-		gamebian_reboot_notice_ready_to_show 0
-		return $?
-	fi
-	gamebian_steam_kiosk_ready || return 1
-	gamebian_steam_install_idle
-}
-
-if [ "${_no_wait}" -eq 0 ]; then
-	_elapsed=0
-	while [ "${_elapsed}" -lt 7200 ]; do
-		if _gamebian_reboot_notice_ready; then
-			log "reboot notice ready (elapsed=${_elapsed} force=${_force})"
-			break
-		fi
-		if gamebian_steam_process_busy 2>/dev/null; then
-			log "waiting: steam busy (${_elapsed}s) eligible=$(gamebian_reboot_notice_eligible 2>/dev/null; echo $?)"
-		fi
-		sleep 3
-		_elapsed=$((_elapsed + 3))
-		[ "${_elapsed}" -ge 7200 ] && exit 0
-	done
-fi
-
-if ! _gamebian_reboot_notice_ready; then
-	log "skip: eligible=$(gamebian_reboot_notice_eligible 2>/dev/null; echo $?) ready=$(gamebian_reboot_notice_ready_to_show 0 2>/dev/null; echo $?) idle=$(gamebian_steam_install_idle 2>/dev/null; echo $?) force=${_force}"
+if command -v gamebian_steam_binary_present >/dev/null 2>&1 \
+	&& gamebian_steam_binary_present; then
+	log "skip: Steam installed"
 	exit 0
 fi
 
-_sent="${XDG_RUNTIME_DIR}/gamebian-openbox-notify.sent"
-if [ -f "${_sent}" ] && [ "${_force}" -eq 0 ] && [ "${_no_wait}" -eq 0 ]; then
-	log "skip: already sent this session"
-	exit 0
-fi
-
-gamebian_show_openbox_notices || exit 1
+log "start DISPLAY=${DISPLAY}"
+gamebian_show_desktop_welcome_notices
 log "done"

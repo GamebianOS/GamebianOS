@@ -96,16 +96,23 @@ else
   echo "WARNING: missing $GAMEBIAN_CTRL_SRC — ISO will lack gamebian_controller_menu.py" >&2
 fi
 
-# Installed session default wallpaper (matches gamebian-installed theme). Live ISO still uses ~/.../gamebian/.
-INST_BG="$SCRIPT_ROOT/design/installed-bakgrounds/background.png"
+# Installed session wallpapers: background.png + per-color PNGs (green.png, …).
+INST_ART="$SCRIPT_ROOT/design/installed-backgrounds"
+INST_BG="$INST_ART/background.png"
 INST_BG_DEST="$BUILD_ROOT/config/includes.chroot/usr/share/backgrounds/gamebian-installed"
-if [[ -f "$INST_BG" ]]; then
+if [[ -d "$INST_ART" ]]; then
   mkdir -p "$INST_BG_DEST"
-  cp -a "$INST_BG" "$INST_BG_DEST/background.png"
+  if [[ -f "$INST_BG" ]]; then
+    cp -a "$INST_BG" "$INST_BG_DEST/background.png"
+  fi
+  for _color in green yellow blue red black purple; do
+    if [[ -f "$INST_ART/${_color}.png" ]]; then
+      cp -a "$INST_ART/${_color}.png" "$INST_BG_DEST/${_color}.png"
+    fi
+  done
 fi
 
 # Install branding: LightDM avatar + Debian ceratopsian GRUB images (sources in design/).
-INST_ART="$SCRIPT_ROOT/design/installed-bakgrounds"
 GAMEBIAN_PIX="$BUILD_ROOT/config/includes.chroot/usr/share/pixmaps"
 if [[ -f "$INST_ART/user-installed-icon.png" ]]; then
   mkdir -p "$GAMEBIAN_PIX"

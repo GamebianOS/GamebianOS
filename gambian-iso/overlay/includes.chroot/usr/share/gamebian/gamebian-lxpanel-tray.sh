@@ -1,28 +1,15 @@
 #!/bin/sh
 # Start nm-tray, blueman-applet, and optional Steam systray after lxpanel's tray plugin exists.
-# Poll quickly (100ms); retry embed briefly instead of a long fixed sleep.
 
-gamebian_tray_env() {
-	export DISPLAY="${DISPLAY:-:0}"
-	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
-	export GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}"
-	if [ -r "${HOME}/.config/gamebian/desktop-theme" ]; then
-		read -r _gb_theme < "${HOME}/.config/gamebian/desktop-theme" || _gb_theme=""
-		[ -n "${_gb_theme}" ] && export GTK_THEME="${_gb_theme}"
-	fi
-	if [ -z "${GTK_THEME:-}" ]; then
-		export GTK_THEME=gamebian-installed
-	fi
-	if grep -qw boot=live /proc/cmdline 2>/dev/null \
-		&& [ ! -r "${HOME}/.config/gamebian/desktop-theme" ]; then
-		export GTK_THEME=gamebian
-	fi
-	export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
-	export QT_QPA_PLATFORMTHEME=gtk3
-	export QT_AUTO_SCREEN_SCALE_FACTOR=0
-	export QT_IM_MODULE=
-}
+if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-openbox-session-env.sh
+	gamebian_openbox_session_env
+elif [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+	gamebian_export_session_env
+fi
 
 gamebian_tray_host_ready() {
 	command -v xprop >/dev/null 2>&1 || return 1
@@ -63,6 +50,16 @@ gamebian_start_nm_tray() {
 	return 1
 }
 
+gamebian_restart_nm_tray() {
+	if ! command -v nm-tray >/dev/null 2>&1; then
+		return 1
+	fi
+	pkill -x nm-tray 2>/dev/null || true
+	sleep 0.25
+	nm-tray >/dev/null 2>&1 &
+	return 0
+}
+
 gamebian_start_tray_apps() {
 	_started=0
 	gamebian_start_nm_tray && _started=1
@@ -83,26 +80,19 @@ gamebian_start_tray_apps() {
 	return "${_started}"
 }
 
-gamebian_retry_tray_embed() {
-	_pass=0
-	while [ "${_pass}" -lt 6 ]; do
-		sleep 0.5
-		_pass=$((_pass + 1))
-		gamebian_start_nm_tray
-		if command -v blueman-applet >/dev/null 2>&1 \
-			&& ! pgrep -f '[b]lueman-applet' >/dev/null 2>&1; then
-			blueman-applet >/dev/null 2>&1 &
-		fi
-		if pgrep -x nm-tray >/dev/null 2>&1; then
-			return 0
-		fi
-	done
-	return 1
+gamebian_refresh_tray_icons() {
+	# Installed disk: early nm-tray warm-up can embed before icons resolve → white squares.
+	if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+		return 0
+	fi
+	gamebian_restart_nm_tray
+	if command -v blueman-applet >/dev/null 2>&1; then
+		pkill -f '[b]lueman-applet' 2>/dev/null || true
+		sleep 0.15
+		blueman-applet >/dev/null 2>&1 &
+	fi
 }
 
-gamebian_tray_env
-
-# Wait for NetworkManager dbus while lxpanel registers the systray host (overlap work).
 gamebian_wait_for_nm &
 _nm_wait_pid=$!
 
@@ -111,19 +101,11 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	_wait_loops=100
 fi
 
-# Warm nm-tray once lxpanel has had a moment to start (helps Qt + NM connect early).
-(
-	sleep 0.4
-	wait "${_nm_wait_pid}" 2>/dev/null || gamebian_wait_for_nm
-	gamebian_start_nm_tray
-) &
-
 if gamebian_wait_for_tray "${_wait_loops}"; then
 	wait "${_nm_wait_pid}" 2>/dev/null || gamebian_wait_for_nm
 	gamebian_start_tray_apps
-	gamebian_retry_tray_embed
+	gamebian_refresh_tray_icons
 else
 	wait "${_nm_wait_pid}" 2>/dev/null || true
 	gamebian_start_tray_apps
-	gamebian_retry_tray_embed
 fi

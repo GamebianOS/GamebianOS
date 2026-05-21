@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+for _theme in Papirus Papirus-Dark; do
+	_dir="/usr/share/icons/${_theme}"
+	if [ -d "${_dir}" ] && command -v gtk-update-icon-cache >/dev/null 2>&1; then
+		gtk-update-icon-cache -f "${_dir}" 2>/dev/null || true
+	fi
+done
+chmod 0644 /usr/share/gamebian/gamebian-openbox-session-env.sh 2>/dev/null || true
+exit 0

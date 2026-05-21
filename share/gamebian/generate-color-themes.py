@@ -5,18 +5,21 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# From TODO/Gamescope- Kernel Optimizations (branding palette)
+# Primary branding colors (TODO/Gamescope- Kernel Optimizations)
 PALETTE: dict[str, str] = {
-    "green": "#55f201",
-    "yellow": "#f2ae01",
-    "blue": "#0145f2",
-    "red": "#f20135",
-    "black": "#000000",
-    "purple": "#6e01a8",
+    "green": "#0B441D",
+    "yellow": "#F89917",
+    "blue": "#021C4A",
+    "red": "#9E1720",
+    "black": "#1C1C24",
+    "purple": "#340E39",
 }
 
 SKEL_THEMES = Path(__file__).resolve().parents[2] / (
     "gambian-iso/overlay/includes.chroot/etc/skel/.themes"
+)
+SKEL_ROFI = Path(__file__).resolve().parents[2] / (
+    "gambian-iso/overlay/includes.chroot/etc/skel/.local/share/rofi/themes"
 )
 
 
@@ -52,18 +55,18 @@ def palette_for(name: str, accent: str) -> dict[str, str]:
     accent = accent.lower()
     if name == "black":
         return {
-            "bg": "#151515",
+            "bg": accent,
             "fg": "#ebebeb",
-            "base": "#202020",
-            "hover": "#2d2d2d",
-            "selected_bg": "#3a3a3a",
+            "base": _lighten(accent, 0.06),
+            "hover": _lighten(accent, 0.12),
+            "selected_bg": _lighten(accent, 0.18),
             "selected_fg": "#ffffff",
-            "insensitive_bg": "#141414",
+            "insensitive_bg": _darken(accent, 0.12),
             "insensitive_fg": "#888888",
-            "borders": "#2a2a2a",
+            "borders": _lighten(accent, 0.08),
             "accent": accent,
             "view_text": "#ebebeb",
-            "header_bg": "#0d0d0d",
+            "header_bg": _darken(accent, 0.15),
             "dark_ui": True,
         }
     lum = _luminance(accent)
@@ -413,6 +416,116 @@ osd.unhilight.bg.color: {btn_hover}
 """
 
 
+def _hex_rgba(hex_color: str, alpha: float = 0.92) -> str:
+    r, g, b = _hex_to_rgb(hex_color)
+    a = max(0.0, min(1.0, alpha))
+    return f"rgba({r},{g},{b},{a})"
+
+
+def rofi_rasi(name: str, p: dict[str, str]) -> str:
+    acc = p["accent"]
+    light = _lighten(acc, 0.28)
+    panel = _darken(acc, 0.45) if name != "yellow" else _darken(acc, 0.12)
+    main_bg = _hex_rgba(_darken(acc, 0.55) if p["dark_ui"] else acc, 0.9)
+    bar_bg = _hex_rgba(panel, 0.96)
+    if _luminance(acc) < 0.55 or p["dark_ui"]:
+        text_main = "#f4f4f4"
+        text_muted = _lighten(acc, 0.42)
+        selected_text = "#ffffff"
+    else:
+        text_main = "#1a1a1a"
+        text_muted = _darken(acc, 0.28)
+        selected_text = "#1a1a1a"
+    return f"""/**
+ * Rofi — Gamebian {name} ({acc})
+ */
+
+* {{
+    text-color: {text_main};
+    background-color: rgba(0,0,0,0);
+    dark: {panel};
+    black: {panel};
+    lightblack: {panel};
+    red: {acc};
+    lightred: {light};
+    green: {acc};
+    lightgreen: {light};
+    yellow: {acc};
+    lightyellow: {light};
+    blue: {acc};
+    lightblue: {light};
+    magenta: {acc};
+    lightmagenta: {light};
+    cyan: {light};
+    lightcyan: {light};
+    white: {text_muted};
+    lightwhite: {text_main};
+    highlight: bold {light};
+}}
+window {{
+    height: 90%;
+    width: 30em;
+    location: west;
+    anchor: west;
+    border: 0px 2px 0px 0px;
+    text-color: @lightwhite;
+}}
+mode-switcher {{
+    border: 2px 0px 0px 0px;
+    background-color: @lightblack;
+    padding: 4px;
+}}
+button selected {{
+    border-color: @lightgreen;
+    text-color: @lightgreen;
+}}
+inputbar {{
+    background-color: @lightblack;
+    text-color: @lightgreen;
+    padding: 4px;
+    border: 0px 0px 2px 0px;
+}}
+mainbox {{
+    expand: true;
+    background-color: {main_bg};
+    spacing: 1em;
+}}
+listview {{
+    padding: 0em 0.4em 0em 1em;
+    dynamic: false;
+    lines: 0;
+}}
+element-text {{
+    background-color: inherit;
+    text-color: inherit;
+}}
+element selected normal {{
+    background-color: @blue;
+}}
+element normal active {{
+    text-color: @lightblue;
+}}
+element normal urgent {{
+    text-color: @lightred;
+}}
+element selected active {{
+    background-color: @lightblue;
+    text-color: {selected_text};
+}}
+element selected urgent {{
+    background-color: @lightred;
+    text-color: {selected_text};
+}}
+error-message {{
+    expand: true;
+    background-color: @red;
+    border-color: @dark;
+    border: 2px;
+    padding: 1em;
+}}
+"""
+
+
 def index_theme(name: str, accent: str) -> str:
     title = name.capitalize()
     return f"""[Desktop Entry]
@@ -439,6 +552,10 @@ def write_theme(name: str, accent: str) -> None:
     (root / "openbox-3" / "themerc").write_text(openbox_themerc(name, p), encoding="utf-8")
     (root / "index.theme").write_text(index_theme(name, accent), encoding="utf-8")
     print(f"wrote {root}")
+    SKEL_ROFI.mkdir(parents=True, exist_ok=True)
+    rofi_path = SKEL_ROFI / f"{name}.rasi"
+    rofi_path.write_text(rofi_rasi(name, p), encoding="utf-8")
+    print(f"wrote {rofi_path}")
 
 
 def main() -> None:

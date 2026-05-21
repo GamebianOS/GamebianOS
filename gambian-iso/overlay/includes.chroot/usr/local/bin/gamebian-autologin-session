@@ -1,6 +1,7 @@
 #!/bin/sh
-# LightDM autologin: Desktop (Openbox) until Steam is ready, then gamescope (see markers).
-# Greeter still offers separate Desktop / Steam sessions.
+# LightDM autologin dispatcher.
+# Live ISO → Openbox. Installed + Steam package → gamescope (not Openbox).
+# Desktop only via greeter "Desktop" or ~/.config/gamebian/prefer-openbox-desktop.
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
@@ -20,12 +21,11 @@ if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	. /usr/share/gamebian/gamebian-steam-ready.sh
 fi
 
-PREFER="${HOME}/.config/gamebian/prefer-openbox-desktop"
-if [ -f "${PREFER}" ]; then
+if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
 	exec /usr/bin/openbox-session
 fi
 
-if gamebian_steam_kiosk_ready 2>/dev/null; then
+if gamebian_steam_binary_present 2>/dev/null; then
 	exec /usr/local/bin/gamebian-steam-gamescope-session
 fi
 

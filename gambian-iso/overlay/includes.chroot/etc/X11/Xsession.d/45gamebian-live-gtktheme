@@ -7,9 +7,12 @@ if [ -z "${GTK_THEME:-}" ]; then
     fi
     export GTK_THEME
 fi
-# Icon theme: export for every boot session (not only live). Qt gtk3 platform (nm-tray) uses GtkSettings;
-# without this on disk installs, tray icons (e.g. NM, Bluetooth) can render missing / wrong vs live ISO.
+# Icon theme: Qt nm-tray uses gtk3 platform theme. Live = Papirus; installed dark GTK = Papirus-Dark.
 if [ -z "${GTK_ICON_THEME:-}" ]; then
-    GTK_ICON_THEME=Papirus
+    if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+        GTK_ICON_THEME=Papirus
+    else
+        GTK_ICON_THEME=Papirus-Dark
+    fi
     export GTK_ICON_THEME
 fi

@@ -32,15 +32,6 @@ _enable_steam_lightdm_session() {
 	return 0
 }
 
-_queue_openbox_notify() {
-	if command -v gamebian_queue_reboot_notify >/dev/null 2>&1; then
-		gamebian_queue_reboot_notify
-	else
-		mkdir -p "${HOME}/.config/gamebian" "${HOME}/.cache/gamebian"
-		touch "${HOME}/.config/gamebian/pending-openbox-notify"
-	fi
-}
-
 _find_steam_bin() {
 	steam_bin=""
 	for _c in /usr/bin/steam /usr/local/bin/steam /usr/games/steam; do
@@ -138,8 +129,7 @@ if [ "${_steam_session_enabled}" -eq 1 ] \
 	touch "${HOME}/.config/gamebian-firstboot-steam.done"
 	echo ""
 	echo "Steam session is enabled for the next boot."
-	echo 'Please reboot, or logout and select "Steam" to continue your Steam/Gamescope session.'
-	_queue_openbox_notify
+	echo 'Logout and select "Steam" at the login screen, or reboot.'
 else
 	echo ""
 	echo "Steam session was not enabled. Run:" >&2

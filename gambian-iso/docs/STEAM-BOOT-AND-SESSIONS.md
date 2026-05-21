@@ -1,6 +1,6 @@
 # Steam / gamescope boot and session flow
 
-This document describes how the Gamebian Openbox live ISO boots, installs to disk, runs Steam setup on first login, and switches to a gamescope + Steam kiosk session after reboot. It matches the scripts under `overlay/includes.chroot/`.
+This document describes how the Gamebian Openbox live ISO boots, installs to disk, and autologins into a gamescope + Steam kiosk when Steam is installed. It matches the scripts under `overlay/includes.chroot/`.
 
 ## End-to-end flow
 
@@ -19,29 +19,19 @@ flowchart TD
     WEB[gamebian-web-install on target]
   end
 
-  subgraph disk1 [First installed boot]
+  subgraph disk [Installed boot Steam present]
     AL[autologin-session=gamebian-autologin]
     AL --> DISP{gamebian-autologin-session}
-    DISP -->|kiosk not ready| OB1[openbox-session]
-    OB1 --> AS[openbox autostart]
-    AS --> TERM[xfce4-terminal + steam-firstboot-terminal.sh]
-    TERM --> EN[/usr/sbin/gamebian-enable-steam-lightdm-session/]
-    EN --> M1[markers: firstboot-steam.done]
-    EN --> M2[99-gamebian-autologin-steam.conf user-session=gamebian-steam]
-  end
-
-  subgraph disk2 [After reboot]
-    AL2[gamebian-autologin-session]
-    AL2 -->|gamebian_steam_kiosk_ready| GS[gamebian-steam-gamescope-session]
+    DISP -->|Steam installed| GS[gamebian-steam-gamescope-session]
     GS --> BP[gamebian-steam-bigpicture]
     BP --> GSCOPE[gamescope + steam -gamepadui -steamos3]
+    DISP -->|prefer-openbox or no Steam| OB[openbox-session]
   end
 
-  live --> install --> disk1
-  disk1 -->|manual reboot| disk2
+  live --> install --> disk
 ```
 
-**Important:** Installed-disk Openbox-first boot is **not** implemented by Calamares writing `90-gamebian-openbox-first-session.conf`. That filename is legacy; `shellprocess@gamebian-sshprep` only **removes** it (and other old drop-ins). Openbox-first uses **`gamebian-autologin-session`** plus user marker files under `~/.config/`.
+**Important:** When **Steam is installed**, autologin goes **straight to gamescope** (not Openbox). Sign-in and updates happen in Steam Big Picture. **Desktop (Openbox)** is only via the greeter **Desktop** session or `~/.config/gamebian/prefer-openbox-desktop`. Legacy `90-gamebian-openbox-first-session.conf` is never written; sshprep only removes old drop-ins.
 
 ---
 
@@ -50,7 +40,7 @@ flowchart TD
 | Component | Path | Role |
 |-----------|------|------|
 | Live autologin user | `etc/lightdm/lightdm.conf.d/50-gamebian-live-autologin.conf` | `autologin-user=live` (deleted on disk install) |
-| Session dispatcher | `usr/local/bin/gamebian-autologin-session` | If `boot=live` in cmdline → always `openbox-session` |
+| Session dispatcher | `usr/local/bin/gamebian-autologin-session` | Live → Openbox; installed + Steam → gamescope |
 | Desktop autostart | `etc/skel/.config/openbox/autostart` | lxpanel, NM, notifyd; starts **Calamares** when live |
 | Web install (target only) | `Build/share/calamares-gamebian/usr/local/sbin/gamebian-web-install` | APT + pip install `gamebian-web` in installed chroot |
 | APT sources helper | `usr/local/sbin/gamebian-ensure-apt-sources` | Enables contrib/non-free before Calamares apt steps |
@@ -97,7 +87,7 @@ Persistent overlay config (survives install):
 
 | File | Settings |
 |------|----------|
-| `98-gamebian-autologin.conf` | `autologin-session=gamebian-autologin`, `user-session=gamebian-desktop` |
+| `98-gamebian-autologin.conf` | `autologin-session=gamebian-autologin`, `user-session=gamebian-steam` |
 | `99-gamebian-sessions-directory.conf` | Greeter lists `/usr/share/gamebian/xsessions/` only |
 
 Greeter sessions:
@@ -110,25 +100,21 @@ Greeter sessions:
 
 ---
 
-## Phase 3 — First Openbox session (Steam setup)
+## Phase 3 — Installed boot (Steam → gamescope)
 
 1. LightDM autologins → **`gamebian-autologin-session`**.
-2. While `gamebian_steam_kiosk_ready` is false (`usr/share/gamebian/gamebian-steam-ready.sh`), dispatcher runs **`openbox-session`**.
-3. Openbox **autostart** (installed disk only):
-   - If `loginusers.vdf` already exists → `sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session` and touch `gamebian-firstboot-steam.done` (NOPASSWD for `%sudo` in `etc/sudoers.d/gamebian-enable-steam-session`).
-   - Otherwise, once → `xfce4-terminal` running **`steam-firstboot-terminal.sh`**.
-4. **First-boot terminal** runs `steam`; on exit:
-   - Calls **`gamebian-enable-steam-lightdm-session`** (writes `99-gamebian-autologin-steam.conf` with `user-session=gamebian-steam`),
-   - Touches **`gamebian-firstboot-steam.done`** and **`gamebian-firstboot-steam.run-finished`** (only after enable succeeds),
-   - Queues reboot notification via **`gamebian-openbox-notify.sh`**.
-5. **User must reboot manually** — nothing in the flow calls `reboot`.
+2. If **`gamebian_steam_binary_present`** → **`gamebian-steam-gamescope-session`** (no Openbox detour).
+3. **`gamebian-steam-gamescope-session`** always starts kiosk when Steam is installed (sign-in / first-run in Steam UI).
+4. **`gamebian-steam-bigpicture`** runs gamescope + Steam (`-gamepadui`, `-steamos3`).
+5. Optional **Desktop** session: greeter **Desktop** or `touch ~/.config/gamebian/prefer-openbox-desktop` then re-login → Openbox (first-boot terminal, lxpanel, etc.).
+
+**`gamebian-enable-steam-lightdm-session`** still sets markers and `99-gamebian-autologin-steam.conf` when run from Desktop setup or controller menu; autologin no longer waits for those markers before gamescope.
 
 ---
 
-## Phase 4 — Post-reboot gamescope kiosk
+## Phase 4 — Gamescope session details
 
-1. **`gamebian-autologin-session`** → `exec gamebian-steam-gamescope-session` when kiosk is ready.
-2. **`gamebian-steam-gamescope-session`** sets `GAMEBIAN_GAMESCOPE_SESSION=1`, sources `/etc/default/gamebian-steam-gamescope` and `~/.config/gamebian/steam-gamescope.env`, starts a polkit agent, then **`gamebian-steam-bigpicture`**.
+1. **`gamebian-steam-gamescope-session`** sets `GAMEBIAN_GAMESCOPE_SESSION=1`, sources `/etc/default/gamebian-steam-gamescope` and `~/.config/gamebian/steam-gamescope.env`, starts a polkit agent, then **`gamebian-steam-bigpicture`**.
 3. **`gamebian-steam-bigpicture`** runs **gamescope** (full compositor in kiosk, not `-e` embed) + Steam with `-gamepadui` and usually **`-steamos3`** so Steam’s power menu can call **`steamos-session-select`**.
 4. **Switch to Desktop** (Steam power menu): `steamos-session-select desktop` → **`gamebian-steam-switch-to-desktop`** — in-session handoff only (flag file + stop steam/gamescope); **does not** change next boot unless you run **`gamebian-enable-openbox-lightdm-session`**.
 
@@ -148,7 +134,6 @@ All under `$HOME/.config/` unless noted.
 | `gamebian/prefer-openbox-desktop` | Force autologin to Openbox even when kiosk is ready |
 | `gamebian/switch-to-openbox` | In kiosk session: hand off to Openbox after Steam/gamescope exit |
 | `gamebian/in-gamescope-kiosk-session` | Runtime marker while kiosk session is active |
-| `gamebian/pending-openbox-notify` | Show reboot notification on next Openbox start |
 
 Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh` (markers, sign-in, poll), `gamebian-steam-kiosk-env.sh`.
 
@@ -178,7 +163,7 @@ Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh` (markers, sign-in, 
 
 | Script | Role |
 |--------|------|
-| `gamebian-autologin-session` | **Main autologin dispatcher** — live → Openbox; disk → Openbox until kiosk ready, else gamescope |
+| `gamebian-autologin-session` | **Main autologin dispatcher** — live → Openbox; disk + Steam → gamescope |
 | `gamebian-lightdm-session` | Legacy hidden dispatcher (`gamebian.desktop`); logic differs — do not use for normal autologin |
 | `gamebian-steam-gamescope-session` | LightDM **Steam** session entry; kiosk env + `gamebian-steam-bigpicture` |
 | `gamebian-steam-bigpicture` | gamescope + Steam launcher; Openbox fallback when not forced |
@@ -207,9 +192,9 @@ Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh` (markers, sign-in, 
 
 | Script | Role |
 |--------|------|
-| `steam-firstboot-terminal.sh` | First disk login: run Steam, enable LightDM steam preference, reboot notice |
-| `gamebian-openbox-notify.sh` | libnotify: reboot + controller + web URL (`--no-wait`, `--force`) |
-| `gamebian-steam-ready.sh` | `gamebian_steam_kiosk_ready`, `gamebian_have_loginusers_vdf`, `gamebian_on_steam_signed_in`, `gamebian_poll_steam_signin_then_notify` |
+| `steam-firstboot-terminal.sh` | Before Steam package: install/run Steam, enable LightDM steam preference |
+| `gamebian-openbox-notify.sh` | Desktop tips each Openbox login **before** Steam is installed; no-op after |
+| `gamebian-steam-ready.sh` | `gamebian_steam_kiosk_ready`, `gamebian_steam_binary_present`, `gamebian_have_loginusers_vdf` |
 | `gamebian-steam-kiosk-env.sh` | Kiosk marker, switch-to-openbox, session detection |
 | `gamebian-fix-steam-share.sh` | Debian `~/.steam/debian-installation` ↔ `~/.local/share/Steam` symlink |
 | `gamebian-session-log.sh` | Append to `~/.cache/gamebian/lightdm-login.log` |
@@ -292,13 +277,13 @@ sudo gamebian-fix-steam-boot
 
 1. **Documentation drift (fixed in repo):** Older docs referred to `90-gamebian-openbox-first-session.conf` and `99-gamebian-steam-session.conf` being written by Calamares; current design uses the autologin dispatcher only.
 
-2. **`gamebian-lightdm-session`:** Hidden legacy session; logic differs from `gamebian-autologin-session`. Normal installs use autologin only.
+2. **`gamebian-lightdm-session`:** Hidden legacy session; same routing as `gamebian-autologin-session`. Normal installs use autologin only.
 
 3. **`steamos-session-select gamescope`:** Configures next boot; does not enter kiosk immediately.
 
 4. **gamescope on hybrid NVIDIA + Mesa NVK:** Often fails; use `steam-gamescope.env` or proprietary drivers (operational, not a script bug).
 
-5. **Manual reboot required** after first Steam setup; notifications remind but do not reboot automatically.
+5. **Desktop notifications** (welcome, logout→Steam, `http://127.0.0.1:8844`) only while Steam is **not** installed; no Openbox notify logic after `steam` is on disk.
 
 6. **`usr/local/bin/steam-installer`:** Redundant wrapper around `/usr/bin/steam` (harmless).
 
