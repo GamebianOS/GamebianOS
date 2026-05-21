@@ -34,11 +34,13 @@ if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	cp -f /usr/share/gamebian/lxpanel/panel-live "${HOME}/.config/lxpanel/default/panels/panel"
 else
 	cp -f /usr/share/gamebian/lxpanel/panel-installed "${HOME}/.config/lxpanel/default/panels/panel"
-	# Stale lxpanel from a prior partial session keeps an empty systray on reinstall / first disk boot.
-	pkill -x nm-tray 2>/dev/null || true
-	pkill -f '[b]lueman-applet' 2>/dev/null || true
-	pkill -x lxpanel 2>/dev/null || true
-	sleep 0.3
+	# Stale lxpanel/systray only when panel was already running (re-login), not every cold boot.
+	if pgrep -x lxpanel >/dev/null 2>&1; then
+		pkill -x nm-tray 2>/dev/null || true
+		pkill -f '[b]lueman-applet' 2>/dev/null || true
+		pkill -x lxpanel 2>/dev/null || true
+		sleep 0.15
+	fi
 fi
 lxpanel &
 

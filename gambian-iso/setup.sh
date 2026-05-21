@@ -39,6 +39,14 @@ lb config \
   --binary-image iso-hybrid \
   --bootappend-live "boot=live components username=live hostname=gamebian-openbox"
 
+# GRUB: live USB (bootloaders/) + installed disk (branding/grub, ceratopsian) — same PNG as Calamares.
+INSTALL_GRUB="$SCRIPT_ROOT/../share/gamebian/install-grub-branding.sh"
+if [[ -x "$INSTALL_GRUB" ]]; then
+  "$INSTALL_GRUB"
+else
+  echo "WARNING: missing $INSTALL_GRUB — live ISO may show Debian testing GRUB art." >&2
+fi
+
 mkdir -p config/package-lists config/includes.chroot config/includes.chroot_before_packages \
   config/hooks/normal config/bootloaders
 shopt -s nullglob
@@ -116,24 +124,8 @@ if [[ -f "$INST_ART/user-installed-icon.png" ]]; then
   fi
   chmod 0644 "$SKEL/.face" "$SKEL/.face.icon"
 fi
-GRUB_CER="$BUILD_ROOT/config/includes.chroot/usr/share/desktop-base/ceratopsian-theme/grub"
-LBL_GRUB="$BUILD_ROOT/config/bootloaders/grub-pc"
-GB_BR="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/branding"
-if [[ -f "$INST_ART/grub-16x9.png" ]]; then
-  mkdir -p "$GRUB_CER" "$GB_BR/grub" "$GB_BR" "$LBL_GRUB"
-  cp -a "$INST_ART/grub-16x9.png" "$GRUB_CER/"
-  cp -a "$INST_ART/grub-16x9.png" "$GB_BR/grub-16x9.png"
-  cp -a "$INST_ART/grub-16x9.png" "$GB_BR/grub/wallpaper.png"
-  cp -a "$INST_ART/grub-16x9.png" "$LBL_GRUB/splash.png"
-fi
-if [[ -f "$INST_ART/grub-4x3.png" ]]; then
-  mkdir -p "$GRUB_CER" "$GB_BR"
-  cp -a "$INST_ART/grub-4x3.png" "$GRUB_CER/"
-  cp -a "$INST_ART/grub-4x3.png" "$GB_BR/grub-4x3.png"
-fi
-if [[ -f "$INST_ART/grub-square.png" ]]; then
-  mkdir -p "$GB_BR"
-  cp -a "$INST_ART/grub-square.png" "$GB_BR/grub-square.png"
+if [[ -x "$INSTALL_GRUB" ]]; then
+  "$INSTALL_GRUB" "$BUILD_ROOT/config"
 fi
 
 # Panel / rofi launcher icons: live ISO vs installed disk (see gamebian-menu*.desktop + lxpanel).

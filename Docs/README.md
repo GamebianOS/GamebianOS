@@ -4,6 +4,8 @@ Short descriptions of Gamebian overlay scripts under `Build/gambian-iso/overlay/
 
 For the full boot → Openbox → Steam first-boot → gamescope flow, see [STEAM-BOOT-AND-SESSIONS.md](../gambian-iso/docs/STEAM-BOOT-AND-SESSIONS.md). For gamescope/apt on trixie, see [DEBIAN-STEAM-GAMESCOPE.md](../gambian-iso/docs/DEBIAN-STEAM-GAMESCOPE.md).
 
+**Live USB GRUB** uses the same `grub-16x9.png` as installed systems (`overlay/bootloaders/grub-pc|efi/splash.png`, title “Welcome to Gamebian”). Refresh assets with `Build/share/gamebian/install-grub-branding.sh` (also run from `setup.sh`).
+
 Paths below are **on the image** (overlay paths omit `Build/gambian-iso/overlay/includes.chroot`).
 
 ---
@@ -68,7 +70,7 @@ Sourced by session scripts, Openbox autostart, and installers — not usually ru
 |------|-------------|
 | `/usr/share/gamebian/steam-firstboot-terminal.sh` | First-boot wizard: install/run Steam, enable LightDM Steam session, reboot notifications. |
 | `/usr/share/gamebian/gamebian-openbox-notify.sh` | Reboot for gamescope (`--force` skips Steam-idle wait), controller + web tips; zenity/xmessage fallback. |
-| `/usr/share/gamebian/gamebian-lxpanel-tray.sh` | Wait for lxpanel systray; start nm-tray, blueman, Steam tray icons. |
+| `/usr/share/gamebian/gamebian-lxpanel-tray.sh` | Fast systray poll (100ms); NM + nm-tray in parallel; quick embed retries (no 8s delay). |
 
 ---
 
