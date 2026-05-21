@@ -15,10 +15,6 @@ if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	exec /usr/bin/openbox-session
 fi
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
-fi
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh

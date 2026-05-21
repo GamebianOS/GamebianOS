@@ -74,10 +74,6 @@ gamebian_detect_gamescope_wh() {
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
-fi
 if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh

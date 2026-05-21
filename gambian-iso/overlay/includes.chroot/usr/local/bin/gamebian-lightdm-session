@@ -12,9 +12,9 @@ fi
 PREFER="${HOME}/.config/gamebian/prefer-openbox-desktop"
 ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
+	. /usr/share/gamebian/gamebian-steam-ready.sh
 fi
 
 # Explicit “always boot to Openbox” (optional; not set by Switch to Desktop).

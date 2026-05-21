@@ -13,10 +13,6 @@ if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	gamebian_session_log "gamebian-steam-gamescope" "ldm=${GAMEBIAN_LIGHTDM_SESSION} $*"
 fi
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
-fi
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh

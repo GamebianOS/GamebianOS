@@ -150,7 +150,7 @@ All under `$HOME/.config/` unless noted.
 | `gamebian/in-gamescope-kiosk-session` | Runtime marker while kiosk session is active |
 | `gamebian/pending-openbox-notify` | Show reboot notification on next Openbox start |
 
-Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh`, `gamebian-steam-login-check.sh`, `gamebian-steam-kiosk-env.sh`.
+Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh` (markers, sign-in, poll), `gamebian-steam-kiosk-env.sh`.
 
 ---
 
@@ -208,9 +208,8 @@ Shared helpers: `usr/share/gamebian/gamebian-steam-ready.sh`, `gamebian-steam-lo
 | Script | Role |
 |--------|------|
 | `steam-firstboot-terminal.sh` | First disk login: run Steam, enable LightDM steam preference, reboot notice |
-| `gamebian-openbox-notify.sh` | libnotify: reboot + controller + web URL |
-| `gamebian-steam-ready.sh` | `gamebian_steam_kiosk_ready`, `gamebian_steam_process_busy`, etc. |
-| `gamebian-steam-login-check.sh` | `gamebian_have_loginusers_vdf` |
+| `gamebian-openbox-notify.sh` | libnotify: reboot + controller + web URL (`--no-wait`, `--force`) |
+| `gamebian-steam-ready.sh` | `gamebian_steam_kiosk_ready`, `gamebian_have_loginusers_vdf`, `gamebian_on_steam_signed_in`, `gamebian_poll_steam_signin_then_notify` |
 | `gamebian-steam-kiosk-env.sh` | Kiosk marker, switch-to-openbox, session detection |
 | `gamebian-fix-steam-share.sh` | Debian `~/.steam/debian-installation` ↔ `~/.local/share/Steam` symlink |
 | `gamebian-session-log.sh` | Append to `~/.cache/gamebian/lightdm-login.log` |

@@ -5,6 +5,11 @@ set +e
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+
 _enable_steam_lightdm_session() {
 	if [ "$(id -u)" -eq 0 ]; then
 		/usr/sbin/gamebian-enable-steam-lightdm-session
@@ -28,26 +33,11 @@ _enable_steam_lightdm_session() {
 }
 
 _queue_openbox_notify() {
-	mkdir -p "${HOME}/.config/gamebian"
-	touch "${HOME}/.config/gamebian/pending-openbox-notify"
-	export DISPLAY="${DISPLAY:-:0}"
-	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
-	_msg='Please reboot (or log out and choose the Steam session) to start Steam in gamescope Big Picture mode.'
-	if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
-		xfce4-notifyd >/dev/null 2>&1 &
-		sleep 1
-	fi
-	if command -v notify-send >/dev/null 2>&1; then
-		notify-send -a Gamebian -u critical -t 60000 "Reboot for Steam / gamescope" "${_msg}" 2>/dev/null \
-			|| true
-	fi
-	if command -v zenity >/dev/null 2>&1; then
-		zenity --info --title="Gamebian Steam" --width=420 --text="${_msg}" 2>/dev/null &
-	fi
-	if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-		/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force 2>>"${HOME}/.cache/gamebian/openbox-notify.log" \
-			|| true
+	if command -v gamebian_queue_reboot_notify >/dev/null 2>&1; then
+		gamebian_queue_reboot_notify
+	else
+		mkdir -p "${HOME}/.config/gamebian" "${HOME}/.cache/gamebian"
+		touch "${HOME}/.config/gamebian/pending-openbox-notify"
 	fi
 }
 
@@ -83,7 +73,6 @@ _try_install_steam() {
 		fi
 	fi
 
-	# Fallback when overlay helper is not on disk yet (older install / VM).
 	_as_root() {
 		if [ "$(id -u)" -eq 0 ]; then
 			"$@"
@@ -103,7 +92,7 @@ _try_install_steam() {
 	if _as_root apt-get update \
 		&& _as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y steam-installer; then
 		if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then
-			${_sudo} ln -sf ../games/steam /usr/bin/steam 2>/dev/null || true
+			ln -sf ../games/steam /usr/bin/steam 2>/dev/null || true
 		fi
 		_find_steam_bin && return 0
 	fi
@@ -115,12 +104,7 @@ _find_steam_bin || _try_install_steam
 if [ -z "${steam_bin}" ]; then
 	echo ""
 	echo "Steam install failed." >&2
-	echo "From another machine, copy and run:" >&2
-	echo "  scp …/scripts/install-steam-trixie.sh user@host:/tmp/" >&2
-	echo "  sudo /tmp/install-steam-trixie.sh" >&2
-	echo "Or on this system:" >&2
-	echo "  sudo dpkg --add-architecture i386 && sudo apt update" >&2
-	echo "  sudo apt install -y steam-installer" >&2
+	echo "  sudo gamebian-install-steam" >&2
 	read -r -p "$(printf '\nPress Enter to close.')" || true
 	exit 1
 fi
@@ -154,7 +138,7 @@ if [ "${_steam_session_enabled}" -eq 1 ] \
 	touch "${HOME}/.config/gamebian-firstboot-steam.done"
 	echo ""
 	echo "Steam session is enabled for the next boot."
-	echo "Please reboot to continue your Steam/Gamescope session."
+	echo 'Please reboot, or logout and select "Steam" to continue your Steam/Gamescope session.'
 	_queue_openbox_notify
 else
 	echo ""

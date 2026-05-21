@@ -73,10 +73,9 @@ if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/nu
 	xfce4-notifyd >/dev/null 2>&1 &
 	sleep 1
 fi
-# Queued from steam-firstboot-terminal (terminal dbus may not reach notifyd).
+# Queued when notify-send from xfce4-terminal failed (retry with session dbus).
 if [ -f "${HOME}/.config/gamebian/pending-openbox-notify" ] \
 	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-	rm -f "${HOME}/.config/gamebian/pending-openbox-notify"
 	/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force &
 fi
 
@@ -94,101 +93,41 @@ if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	fi
 fi
 
-# Installed disk — Steam first-boot (not live): until ~/.config/gamebian-firstboot-steam.done:
-# optionally open xfce4-terminal with steam-firstboot-terminal.sh once (Steam install/sign-in, then reboot reminder).
-# After first-boot completes, reboot for the Steam/Gamescope session (LightDM: Gamebian (steam / openbox)).
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck source=/usr/share/gamebian/gamebian-steam-login-check.sh
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
+# Installed disk — Steam first-boot (not live): terminal wizard + reboot notice.
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-steam-ready.sh
+	. /usr/share/gamebian/gamebian-steam-ready.sh
 fi
 if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
 	# shellcheck source=/usr/share/gamebian/gamebian-fix-steam-share.sh
 	. /usr/share/gamebian/gamebian-fix-steam-share.sh
 	gamebian_fix_steam_share
 fi
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
-STEAM_ONCE="${HOME}/.config/gamebian-firstboot-steam.done"
-STEAM_PROMPTED="${HOME}/.config/gamebian-firstboot-steam.prompted"
-STEAM_DATA="${XDG_DATA_HOME:-${HOME}/.local/share}/Steam"
-if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; then
-	if command -v steam >/dev/null 2>&1 && command -v xfce4-terminal >/dev/null 2>&1; then
-		has_loginusers=""
-		if ( command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf ); then
-			has_loginusers=1
-		elif [ -f "${STEAM_DATA}/config/loginusers.vdf" ]; then
-			has_loginusers=1
-		elif [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
-			has_loginusers=1
-		fi
-		# Already-logged-in (Valve ~/.local/share/Steam or Debian ~/.steam): enable LightDM gamescope session (NOPASSWD for %sudo).
-		if [ "${has_loginusers}" = 1 ] && command -v sudo >/dev/null 2>&1; then
-			if sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
-				mkdir -p "${HOME}/.config"
-				: > "${STEAM_ONCE}"
-				touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
-				if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-					/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force &
-				fi
-			fi
-		fi
-		if [ ! -f "${STEAM_ONCE}" ] && [ ! -f "${STEAM_PROMPTED}" ]; then
-			mkdir -p "${HOME}/.config"
-			: > "${STEAM_PROMPTED}"
-			( sleep 2 && xfce4-terminal \
-				--title="Steam setup" \
-				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
-		fi
-	elif ! command -v steam >/dev/null 2>&1; then
-		# No Steam yet — offer install/setup (do not mark first-boot done)
-		if [ ! -f "${STEAM_PROMPTED}" ]; then
-			mkdir -p "${HOME}/.config"
-			: > "${STEAM_PROMPTED}"
-			( sleep 2 && xfce4-terminal \
-				--title="Install Steam" \
-				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
-		fi
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null && ! gamebian_firstboot_done; then
+	gamebian_on_steam_signed_in
+	if ! gamebian_firstboot_done && command -v xfce4-terminal >/dev/null 2>&1 \
+		&& [ ! -f "${HOME}/.config/gamebian-firstboot-steam.prompted" ]; then
+		mkdir -p "${HOME}/.config"
+		: >"${HOME}/.config/gamebian-firstboot-steam.prompted"
+		_title="Steam setup"
+		command -v steam >/dev/null 2>&1 || _title="Install Steam"
+		( sleep 2 && xfce4-terminal \
+			--title="${_title}" \
+			-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
 	fi
 fi
 
-# Installed disk: reboot notice when Steam setup completes (quit Steam) or --force while signed in.
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
 	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-	/usr/share/gamebian/gamebian-openbox-notify.sh &
+	_notify_args=""
+	if gamebian_reboot_notice_eligible 2>/dev/null; then
+		_notify_args="--no-wait --force"
+	fi
+	# shellcheck disable=SC2086
+	/usr/share/gamebian/gamebian-openbox-notify.sh ${_notify_args} &
 fi
-# loginusers.vdf can appear while Steam is still on the sign-in screen — poll and notify with --force.
-if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
-	&& [ ! -f "${HOME}/.config/gamebian-firstboot-steam.done" ] \
-	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-	(
-		export DISPLAY="${DISPLAY:-:0}"
-		export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-		export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
-		_poll=0
-		while [ "${_poll}" -lt 120 ]; do
-			if [ -f "${HOME}/.config/gamebian-firstboot-steam.done" ]; then
-				break
-			fi
-			_has_login=""
-			if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
-				_has_login=1
-			elif [ -f "${STEAM_DATA}/config/loginusers.vdf" ] \
-				|| [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
-				_has_login=1
-			fi
-			if [ "${_has_login}" = 1 ]; then
-				if command -v sudo >/dev/null 2>&1 \
-					&& sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
-					mkdir -p "${HOME}/.config"
-					: > "${HOME}/.config/gamebian-firstboot-steam.done"
-					touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
-				fi
-				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force
-				break
-			fi
-			sleep 5
-			_poll=$((_poll + 1))
-		done
-	) &
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null && ! gamebian_firstboot_done; then
+	gamebian_poll_steam_signin_then_notify &
 fi
 
 # Calamares only on live session
