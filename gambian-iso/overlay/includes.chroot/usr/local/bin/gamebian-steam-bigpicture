@@ -82,6 +82,10 @@ if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
 fi
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
 
 GAMESCOPE_BIN="$(find_bin gamescope /usr/games/gamescope /usr/bin/gamescope /usr/local/bin/gamescope)" || GAMESCOPE_BIN=""
 STEAM_BIN="$(find_bin steam /usr/games/steam /usr/bin/steam /usr/local/bin/steam)" || STEAM_BIN=""
@@ -113,7 +117,14 @@ _use_gamescope=1
 case "${GAMEBIAN_SKIP_GAMESCOPE:-}" in
 	1|yes|true|YES|TRUE) _use_gamescope=0 ;;
 esac
-if [ -z "$GAMESCOPE_BIN" ]; then
+if command -v gamebian_use_steam_without_gamescope >/dev/null 2>&1 \
+	&& gamebian_use_steam_without_gamescope; then
+	_use_gamescope=0
+elif [ -n "$GAMESCOPE_BIN" ] && ! "$GAMESCOPE_BIN" --help >/dev/null 2>&1; then
+	log "gamescope broken (missing libs?) — Steam without compositor"
+	GAMESCOPE_BIN=""
+	_use_gamescope=0
+elif [ -z "$GAMESCOPE_BIN" ]; then
 	log "gamescope not installed — will start Steam without compositor"
 	_use_gamescope=0
 fi
@@ -257,7 +268,10 @@ _launch() {
 		done
 	fi
 	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-		log "kiosk: gamescope failed or exited — not starting plain Steam (would loop LightDM autologin)"
+		log "kiosk: gamescope unavailable or exited — starting Steam on X"
+		for _mode in $_steam_modes; do
+			_steam_direct "$_mode"
+		done
 		return 1
 	fi
 	log "starting Steam without gamescope"

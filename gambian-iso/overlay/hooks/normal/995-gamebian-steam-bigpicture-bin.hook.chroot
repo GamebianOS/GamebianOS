@@ -9,6 +9,7 @@ chmod 0755 /usr/local/bin/gamebian-steam-gamescope-session 2>/dev/null || true
 chmod 0755 /usr/local/bin/gamebian-lightdm-session 2>/dev/null || true
 chmod 0755 /usr/local/bin/gamebian-autologin-session 2>/dev/null || true
 chmod 0755 /usr/local/bin/gamebian-fix-steam-boot 2>/dev/null || true
+chmod 0755 /usr/local/sbin/gamebian-install-gamescope /usr/local/sbin/gamebian-install-steam 2>/dev/null || true
 chmod 0644 /usr/share/gamebian/xsessions/gamebian-autologin.desktop 2>/dev/null || true
 chmod 0755 /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
 chmod 0755 /usr/share/gamebian/gamebian-steam-reboot-notice.sh 2>/dev/null || true

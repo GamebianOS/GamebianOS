@@ -1,6 +1,15 @@
 #!/bin/sh
-# Enable Debian contrib + non-free (required for libretro-snes9x and many other cores).
+# Enable Debian contrib + non-free (libretro, steam-installer) and i386 (Steam on amd64).
 # Safe to run repeatedly. Handles classic sources.list and deb822 *.sources files.
+
+ensure_apt_i386() {
+	if dpkg --print-foreign-architectures 2>/dev/null | grep -qx i386; then
+		return 0
+	fi
+	dpkg --add-architecture i386
+	echo "[ensure-apt] enabled foreign architecture i386 (required for steam-installer)"
+	return 0
+}
 
 ensure_apt_contrib_nonfree() {
 	_changed=0

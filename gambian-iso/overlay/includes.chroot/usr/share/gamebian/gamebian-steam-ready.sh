@@ -58,3 +58,23 @@ gamebian_steam_needs_reboot_notice() {
 gamebian_steam_install_idle() {
 	! gamebian_steam_process_busy
 }
+
+# True when gamescope runs (not just a broken partial install from dpkg -i).
+gamebian_gamescope_binary_works() {
+	if [ -f /etc/gamebian/steam-without-gamescope ]; then
+		return 1
+	fi
+	if command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1; then
+		return 0
+	fi
+	if [ -x /usr/games/gamescope ] && /usr/games/gamescope --help >/dev/null 2>&1; then
+		return 0
+	fi
+	return 1
+}
+
+gamebian_use_steam_without_gamescope() {
+	[ -f /etc/gamebian/steam-without-gamescope ] \
+		|| [ -f "${HOME}/.config/gamebian/steam-without-gamescope" ] \
+		|| ! gamebian_gamescope_binary_works
+}

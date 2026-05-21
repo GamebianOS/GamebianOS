@@ -119,8 +119,8 @@ if [ -f "${_sent}" ] && [ "${_force}" -eq 0 ] && [ "${_no_wait}" -eq 0 ]; then
 	exit 0
 fi
 
-gamebian_notify "Please reboot" \
-	'Please reboot to continue your Steam/Gamescope session.' \
+gamebian_notify "Welcome to Gamebian! [Desktop session]" \
+	'Please reboot or logout and select "Steam" to continue your Steam/Gamescope session.' \
 	critical
 
 _ip="$(gamebian_primary_ip)"

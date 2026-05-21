@@ -20,6 +20,8 @@ mate-polkit
 gnome-keyring
 libpam-gnome-keyring
 iproute2
+curl
+ca-certificates
 openssh-client
 openssh-server
 vim
@@ -67,7 +69,7 @@ pavucontrol
 # i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).
 steam-installer
 steam-devices
-# gamescope: contrib; installed in 997-gamebian-extra-apt-packages.hook.chroot (not *.list.chroot).
+# gamescope: built from source (gamescope-build.list.chroot + hook 997); not a trixie .deb.
 
 # Installer (removed from disk install via Calamares packages module + autoremove)
 calamares

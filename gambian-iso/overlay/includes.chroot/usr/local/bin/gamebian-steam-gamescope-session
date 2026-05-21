@@ -4,7 +4,8 @@
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
 # LightDM sets this before Xsession runs (save before we override).
-GAMEBIAN_LIGHTDM_SESSION="${DESKTOP_SESSION:-}${GDMSESSION:-}"
+GAMEBIAN_LIGHTDM_SESSION="${DESKTOP_SESSION:-}"
+[ -z "${GAMEBIAN_LIGHTDM_SESSION}" ] && GAMEBIAN_LIGHTDM_SESSION="${GDMSESSION:-}"
 
 if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	# shellcheck disable=SC1091
@@ -108,8 +109,14 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	fi
 fi
 
-printf '%s gamescope-session: starting kiosk (ldm=%s force=%s)\n' \
-	"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" "${_force_steam}" >>"$_log" 2>/dev/null || true
+if gamebian_use_steam_without_gamescope 2>/dev/null; then
+	printf '%s gamescope-session: no working gamescope — Steam on X (GAMEBIAN_SKIP_GAMESCOPE)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+	export GAMEBIAN_SKIP_GAMESCOPE=1
+else
+	printf '%s gamescope-session: starting kiosk (ldm=%s force=%s)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" "${_force_steam}" >>"$_log" 2>/dev/null || true
+fi
 
 /usr/local/bin/gamebian-steam-bigpicture "$@"
 _rc=$?

@@ -1,5 +1,5 @@
 #!/bin/sh
-# After the main live-build package pass: gamescope (contrib) + libretro-* (non-free).
+# gamescope (source build on pure trixie) + libretro-* (non-free).
 # Best-effort only — must never fail the image build (set -e is intentionally omitted).
 export DEBIAN_FRONTEND=noninteractive
 
@@ -26,7 +26,27 @@ install_one() {
 	return 1
 }
 
-install_one gamescope || true
+_log="/var/log/gamebian-install-gamescope.log"
+mkdir -p /var/log
+
+if [ -x /usr/local/sbin/gamebian-install-gamescope ]; then
+	echo "P: building gamescope from source (trixie, ref ${GAMEBIAN_GAMESCOPE_GIT_REF:-3.16.22})…"
+	export GAMEBIAN_GAMESCOPE_GIT_REF="${GAMEBIAN_GAMESCOPE_GIT_REF:-3.16.22}"
+	export GAMEBIAN_GAMESCOPE_KEEP_SRC="${GAMEBIAN_GAMESCOPE_KEEP_SRC:-0}"
+	/usr/local/sbin/gamebian-install-gamescope 2>&1 | tee "${_log}" || {
+		echo "P: warning: gamebian-install-gamescope failed — see ${_log}" >&2
+	}
+elif install_one gamescope; then
+	:
+else
+	echo "P: warning: gamescope not installed (missing gamebian-install-gamescope)" >&2
+fi
+
+for _bin in gamescope steam; do
+	if [ -x "/usr/games/${_bin}" ] && [ ! -e "/usr/bin/${_bin}" ]; then
+		ln -sf "../games/${_bin}" "/usr/bin/${_bin}"
+	fi
+done
 
 _list=/usr/share/gamebian/debian-retroarch.list
 if [ -f "$_list" ]; then
@@ -36,6 +56,12 @@ if [ -f "$_list" ]; then
 	done <"$_list"
 else
 	echo "P: warning: missing $_list — no libretro cores installed in ISO" >&2
+fi
+
+if command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1; then
+	echo "P: gamescope OK: $(command -v gamescope) — $(gamescope --help 2>&1 | head -n 1)"
+else
+	echo "P: warning: gamescope missing or broken on squashfs — Steam session will use steam-without-gamescope" >&2
 fi
 
 exit 0

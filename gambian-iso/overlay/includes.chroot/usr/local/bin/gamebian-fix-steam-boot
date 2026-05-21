@@ -35,6 +35,13 @@ if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 fi
 
 echo ""
+echo "gamescope: $(command -v gamescope 2>/dev/null || echo NOT INSTALLED)"
+if ! command -v gamescope >/dev/null 2>&1; then
+	echo "Install gamescope (Debian contrib — required for Steam session):"
+	echo "  sudo gamebian-install-gamescope"
+	echo "  # (builds ValveSoftware/gamescope from source on pure trixie)"
+fi
+echo ""
 echo "LightDM session config:"
 grep -hE '^(autologin-session|user-session|autologin-user)=' /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | sort || true
 echo ""

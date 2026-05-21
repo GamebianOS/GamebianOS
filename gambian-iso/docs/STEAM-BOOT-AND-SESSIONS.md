@@ -57,6 +57,31 @@ flowchart TD
 
 `steam-installer` is in the squashfs (`overlay/package-lists/openbox.list.chroot`). First-boot terminal logic is **skipped on live** (every relevant script checks `grep boot=live /proc/cmdline`).
 
+### gamescope is not a normal package list entry
+
+**gamescope** is intentionally **not** in `openbox.list.chroot`. On **pure trixie** it is **built from source** (no sid apt). Installed by:
+
+| When | How |
+|------|-----|
+| ISO build | `hooks/normal/997-gamebian-extra-apt-packages.hook.chroot` → `gamebian-install-gamescope` |
+| Disk install | Calamares `shellprocess@gamebian-gamescope` (7200s; skips if ISO already has gamescope) → `/var/log/gamebian-install-gamescope.log` |
+
+See **`docs/DEBIAN-STEAM-GAMESCOPE.md`**. If the build fails (no network, missing deps), `/etc/gamebian/steam-without-gamescope` is set and Steam runs **fullscreen on X without gamescope**.
+
+**On an already-installed system:**
+
+```bash
+sudo gamebian-install-gamescope
+gamescope --help
+gamebian-debug-boot-session
+```
+
+Remove fallback mode after a successful install:
+
+```bash
+sudo rm -f /etc/gamebian/steam-without-gamescope ~/.config/gamebian/steam-without-gamescope
+```
+
 ---
 
 ## Phase 2 — Fresh disk install
@@ -65,7 +90,7 @@ Calamares runs (among others):
 
 1. **`users`** — creates the install user with `doAutologin: true` (writes `autologin-user` for LightDM).
 2. **`displaymanager`** — enables LightDM; default greeter session file is `gamebian-desktop` (Openbox).
-3. **`shellprocess@gamebian-sshprep`** — removes `50-gamebian-live-autologin.conf` and legacy `90-` / `99-gamebian-steam-session` drop-ins; fixes permissions on session scripts.
+3. **`shellprocess@gamebian-sshprep`** — removes `50-gamebian-live-autologin.conf` and legacy drop-ins; runs **`gamebian-install-gamescope`**; fixes permissions on session scripts.
 4. **`shellprocess@gamebian-web`** — runs `gamebian-web-install` on the target.
 
 Persistent overlay config (survives install):
@@ -255,6 +280,10 @@ sudo gamebian-fix-steam-boot
 **Hybrid GPU / gamescope fails:** Copy `etc/skel/.config/gamebian/steam-gamescope.env.example` to `~/.config/gamebian/steam-gamescope.env` and set `GAMEBIAN_VK_ICD_FILENAMES` to AMD RADV (see example comments). Reboot after editing.
 
 **Stuck on Openbox after setup:** Ensure `gamebian-firstboot-steam.done` exists, run `sudo gamebian-fix-steam-boot`, reboot.
+
+**gamescope not installed after reinstall:** Calamares needs network when `gamebian-install-gamescope` runs. Check `/var/log/gamebian-install-gamescope.log`. If `/etc/gamebian/steam-without-gamescope` exists, remove it after a successful install.
+
+**Steam apt errors after old sid pins:** Run `scripts/repair-apt-for-steam.sh`, then `gamebian-install-steam`. gamescope no longer uses sid — **`gamebian-install-gamescope`** builds from GitHub.
 
 **Kiosk loops or black screen:** Check `session.log` and `steam-bigpicture.log`; try `GAMEBIAN_SKIP_GAMESCOPE=1` temporarily in `steam-gamescope.env` to test plain Steam.
 

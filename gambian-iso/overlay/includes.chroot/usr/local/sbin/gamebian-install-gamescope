@@ -1,0 +1,184 @@
+#!/bin/sh
+# Pure trixie: build gamescope from ValveSoftware/gamescope (no sid apt mixing).
+# ISO hook 997 and Calamares sshprep call this. On failure: steam-without-gamescope.
+set +e
+
+export DEBIAN_FRONTEND=noninteractive
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec sudo "$0" "$@"
+fi
+
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if ! command -v gamebian_gamescope_binary_works >/dev/null 2>&1; then
+	gamebian_gamescope_binary_works() {
+		[ -f /etc/gamebian/steam-without-gamescope ] && return 1
+		command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1 && return 0
+		[ -x /usr/games/gamescope ] && /usr/games/gamescope --help >/dev/null 2>&1
+	}
+fi
+
+_gamebian_disable_sid_mix() {
+	if [ -r /usr/share/gamebian/gamebian-apt-unmix-sid.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-apt-unmix-sid.sh
+		gamebian_apt_disable_sid_mix
+	fi
+}
+
+_gamebian_link_gamescope_bins() {
+	for _b in /usr/local/bin/gamescope /usr/bin/gamescope /usr/games/gamescope; do
+		[ -x "${_b}" ] || continue
+		[ -e /usr/bin/gamescope ] || ln -sf "${_b}" /usr/bin/gamescope 2>/dev/null || true
+		[ -e /usr/games/gamescope ] || ln -sf "${_b}" /usr/games/gamescope 2>/dev/null || true
+		return 0
+	done
+	return 1
+}
+
+_gamebian_steam_without_gamescope() {
+	echo ""
+	echo "gamescope unavailable — enabling Steam session WITHOUT gamescope (fullscreen Steam on X)." >&2
+	mkdir -p /etc/gamebian
+	: > /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_home="$(gamebian_lightdm_user_home)" || _home=""
+		if [ -n "${_home}" ]; then
+			mkdir -p "${_home}/.config/gamebian"
+			: > "${_home}/.config/gamebian/steam-without-gamescope"
+			_u="$(gamebian_lightdm_autologin_user)"
+			[ -n "${_u}" ] && chown "${_u}:${_u}" "${_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+		fi
+	fi
+	echo "Steam LightDM session will still work. Reboot and log in as Steam."
+}
+
+if gamebian_gamescope_binary_works 2>/dev/null; then
+	echo "gamescope OK: $(command -v gamescope 2>/dev/null || echo /usr/games/gamescope)"
+	exit 0
+fi
+
+_gamebian_disable_sid_mix
+
+if [ -r /usr/share/gamebian/ensure-apt-contrib-nonfree.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+	ensure_apt_contrib_nonfree
+fi
+
+apt-get remove -y --purge gamescope 2>/dev/null || true
+dpkg --purge gamescope 2>/dev/null || true
+
+apt-get update -qq 2>/dev/null || apt-get update || {
+	echo "warning: apt-get update failed (need network)" >&2
+	_gamebian_steam_without_gamescope
+	exit 0
+}
+
+# Trixie-native .deb only when Candidate is from trixie (not sid/backports).
+if apt-cache policy gamescope 2>/dev/null | grep -q 'trixie'; then
+	echo "Trying gamescope from trixie apt…"
+	if apt-get install -y gamescope; then
+		_gamebian_link_gamescope_bins
+		if gamebian_gamescope_binary_works 2>/dev/null; then
+			rm -f /etc/gamebian/steam-without-gamescope
+			echo "OK (apt): $(command -v gamescope)"
+			exit 0
+		fi
+	fi
+fi
+
+_gamebian_gamescope_build_deps() {
+	echo "Installing gamescope build dependencies (pure trixie)…"
+	# Prefer Debian packaging deps when source package exists on trixie.
+	apt-get build-dep -y gamescope 2>/dev/null || true
+	apt-get install -y --no-install-recommends \
+		build-essential git meson ninja-build cmake pkg-config python3 \
+		libdrm-dev libvulkan-dev libwayland-dev libx11-dev libsdl2-dev \
+		libpipewire-0.3-dev libliftoff-dev libdisplay-info-dev libseat-dev \
+		libxcomposite-dev libxmu-dev libxi-dev libxres-dev libxcursor-dev libxfixes-dev \
+		libxrandr-dev libxext-dev libxxf86vm-dev libxtst-dev libxdamage-dev libxrender-dev \
+		libx11-xcb-dev libxkbcommon-dev wayland-protocols xwayland \
+		libglm-dev libstb-dev libepoxy-dev libavif-dev \
+		libxcb-composite0-dev libxcb-icccm4-dev libxcb-ewmh-dev libxcb-res0-dev \
+		libluajit-5.1-dev \
+		libxcb-randr0-dev libxcb-render-util0-dev libxcb-xinput-dev \
+		libxcb-sync-dev libxcb-present-dev libxcb-dri3-dev libxcb-util-dev \
+		libinput-dev libpixman-1-dev libcap-dev glslang-tools hwdata \
+		liblua5.4-dev libbenchmark-dev \
+		libgbm-dev libudev-dev libei-dev glslang-dev spirv-headers spirv-tools \
+		libxxhash-dev libavif-dev libdav1d-dev libhwdata-dev \
+		2>/dev/null || apt-get install -y \
+		build-essential git meson ninja-build cmake pkg-config python3 \
+		libdrm-dev libvulkan-dev libwayland-dev libx11-dev libsdl2-dev \
+		libpipewire-0.3-dev libliftoff-dev
+}
+
+_gamebian_gamescope_build_from_source() {
+	_ref="${GAMEBIAN_GAMESCOPE_GIT_REF:-3.16.22}"
+	_src="${GAMEBIAN_GAMESCOPE_SRC_DIR:-/var/tmp/gamebian-gamescope-src}"
+	_build="${GAMEBIAN_GAMESCOPE_BUILD_DIR:-/var/tmp/gamebian-gamescope-build}"
+
+	rm -rf "${_src}" "${_build}"
+	mkdir -p "$(dirname "${_src}")"
+
+	if ! command -v git >/dev/null 2>&1; then
+		apt-get install -y git || return 1
+	fi
+
+	echo "Cloning https://github.com/ValveSoftware/gamescope (ref=${_ref})…"
+	git clone https://github.com/ValveSoftware/gamescope.git "${_src}" || return 1
+	(
+		cd "${_src}" || exit 1
+		git checkout "${_ref}" 2>/dev/null \
+			|| git checkout "tags/${_ref}" 2>/dev/null \
+			|| echo "warning: using default branch (ref ${_ref} not found)" >&2
+		git submodule update --init --recursive
+		meson subprojects download 2>/dev/null || true
+	) || return 1
+
+	(
+		cd "${_src}" || exit 1
+		rm -rf "${_build}"
+		echo "meson setup → ${_build} (prefix=/usr)…"
+		_meson_flags="--prefix=/usr -Dbuildtype=release -Dforce_fallback_for=wlroots,libliftoff,vkroots"
+		if ! meson setup "${_build}" ${_meson_flags}; then
+			echo "retry meson with wlroots:xwayland=disabled…" >&2
+			meson setup "${_build}" ${_meson_flags} -Dwlroots:xwayland=disabled || exit 1
+		fi
+		ninja -C "${_build}" || exit 1
+		ninja -C "${_build}" install || exit 1
+	) || return 1
+
+	ldconfig 2>/dev/null || true
+	_gamebian_link_gamescope_bins
+	return 0
+}
+
+echo "=== gamebian-install-gamescope (trixie: build from source) ==="
+_gamebian_gamescope_build_deps || echo "warning: some build-deps may be missing" >&2
+
+if _gamebian_gamescope_build_from_source; then
+	if gamebian_gamescope_binary_works 2>/dev/null; then
+		rm -f /etc/gamebian/steam-without-gamescope
+		case "${GAMEBIAN_GAMESCOPE_KEEP_SRC:-0}" in
+			0|no|false|NO|FALSE) rm -rf "${GAMEBIAN_GAMESCOPE_SRC_DIR:-/var/tmp/gamebian-gamescope-src}" \
+				"${GAMEBIAN_GAMESCOPE_BUILD_DIR:-/var/tmp/gamebian-gamescope-build}" 2>/dev/null || true ;;
+		esac
+		echo "OK (source): $(command -v gamescope 2>/dev/null || echo /usr/local/bin/gamescope)"
+		gamescope --help 2>&1 | head -n 1
+		exit 0
+	fi
+	echo "warning: gamescope installed but --help failed (runtime libs?)" >&2
+fi
+
+echo "gamescope source build failed. Log: meson/ninja output above." >&2
+echo "Override tag: GAMEBIAN_GAMESCOPE_GIT_REF=3.16.22 sudo $0" >&2
+_gamebian_steam_without_gamescope
+exit 0

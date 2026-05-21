@@ -1,1 +1,1 @@
-%sudo ALL=(root) NOPASSWD: /usr/sbin/gamebian-enable-steam-lightdm-session, /usr/sbin/gamebian-enable-openbox-lightdm-session
+%sudo ALL=(root) NOPASSWD: /usr/sbin/gamebian-enable-steam-lightdm-session, /usr/sbin/gamebian-enable-openbox-lightdm-session, /usr/local/sbin/gamebian-install-steam

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Calamares: enable contrib + non-free on the target before apt install / gamebian-web.
+# Calamares: i386 + contrib + non-free on the target before apt install (steam-installer, libretro).
 set -eu
 . /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+ensure_apt_i386
 ensure_apt_contrib_nonfree

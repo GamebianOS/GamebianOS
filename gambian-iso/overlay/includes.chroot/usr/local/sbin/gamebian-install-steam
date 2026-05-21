@@ -1,0 +1,51 @@
+#!/bin/sh
+# Install Debian steam-installer on amd64 (requires i386 + non-free).
+set -eu
+
+export DEBIAN_FRONTEND=noninteractive
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec sudo "$0" "$@"
+fi
+
+_steam_ok() {
+	command -v steam >/dev/null 2>&1 \
+		|| [ -x /usr/games/steam ] \
+		|| [ -x /usr/bin/steam ]
+}
+
+if _steam_ok; then
+	echo "Steam already installed: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
+	exit 0
+fi
+
+# Sid pins for gamescope often leave libgpg-error0:amd64 newer than :i386 — steam-installer then fails.
+if [ -r /usr/share/gamebian/gamebian-apt-unmix-sid.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-apt-unmix-sid.sh
+	gamebian_apt_disable_sid_mix
+	gamebian_apt_align_libgpg_error0_for_steam || true
+fi
+
+if [ -r /usr/share/gamebian/ensure-apt-contrib-nonfree.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+	ensure_apt_i386
+	ensure_apt_contrib_nonfree
+fi
+
+apt-get update
+apt-get install -y steam-installer
+
+if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then
+	ln -sf ../games/steam /usr/bin/steam
+fi
+
+if _steam_ok; then
+	echo "OK: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
+	exit 0
+fi
+
+echo "steam-installer finished but steam binary not found" >&2
+exit 1

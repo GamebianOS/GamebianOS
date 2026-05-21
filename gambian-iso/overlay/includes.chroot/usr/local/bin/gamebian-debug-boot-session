@@ -91,6 +91,7 @@ done
 echo ""
 
 _section "Would gamebian-steam-gamescope-session start kiosk or fall back to Openbox?"
+echo "  gamescope binary: $(command -v gamescope 2>/dev/null || echo 'NOT INSTALLED')"
 echo "  steam binary: $(command -v steam 2>/dev/null || echo no)"
 echo "  kiosk_ready: $(gamebian_steam_kiosk_ready 2>/dev/null && echo yes || echo no)"
 echo "  install_idle: $(gamebian_steam_install_idle 2>/dev/null && echo yes || echo no)"
@@ -98,7 +99,10 @@ echo "  steam busy: $(gamebian_steam_process_busy 2>/dev/null && echo yes || ech
 if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1; then
 	echo "  loginusers.vdf: $(gamebian_have_loginusers_vdf && echo yes || echo no)"
 fi
-if [ "$(gamebian_steam_kiosk_ready 2>/dev/null && echo y)" = "y" ]; then
+if ! command -v gamescope >/dev/null 2>&1; then
+	echo "  → ROOT CAUSE: gamescope missing — Steam session exits immediately (LightDM greeter loop)."
+	echo "     Fix: sudo gamebian-install-gamescope  (build from source on trixie — see docs/DEBIAN-STEAM-GAMESCOPE.md)"
+elif [ "$(gamebian_steam_kiosk_ready 2>/dev/null && echo y)" = "y" ]; then
 	echo "  → Steam session should run gamescope (not Openbox fallback)."
 else
 	echo "  → Steam session will fall back to Openbox until setup markers exist."
