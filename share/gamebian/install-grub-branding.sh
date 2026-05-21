@@ -62,7 +62,7 @@ fi
 
 # Optional live-build tree (setup.sh passes BUILD_ROOT/config as second arg).
 if [[ -n "${1:-}" ]]; then
-	local _cfg="${1%/}"
+	_cfg="${1%/}"
 	install_bootloader "$_cfg/bootloaders/grub-pc"
 	install_bootloader "$_cfg/bootloaders/grub-efi"
 	mkdir -p "$_cfg/includes.chroot/usr/share/gamebian/branding/grub"
