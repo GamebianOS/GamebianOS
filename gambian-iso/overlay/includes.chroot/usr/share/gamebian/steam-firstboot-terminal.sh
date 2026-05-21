@@ -33,8 +33,20 @@ _queue_openbox_notify() {
 	export DISPLAY="${DISPLAY:-:0}"
 	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+	_msg='Please reboot (or log out and choose the Steam session) to start Steam in gamescope Big Picture mode.'
+	if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
+		xfce4-notifyd >/dev/null 2>&1 &
+		sleep 1
+	fi
+	if command -v notify-send >/dev/null 2>&1; then
+		notify-send -a Gamebian -u critical -t 60000 "Reboot for Steam / gamescope" "${_msg}" 2>/dev/null \
+			|| true
+	fi
+	if command -v zenity >/dev/null 2>&1; then
+		zenity --info --title="Gamebian Steam" --width=420 --text="${_msg}" 2>/dev/null &
+	fi
 	if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-		/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force 2>/dev/null \
+		/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force 2>>"${HOME}/.cache/gamebian/openbox-notify.log" \
 			|| true
 	fi
 }

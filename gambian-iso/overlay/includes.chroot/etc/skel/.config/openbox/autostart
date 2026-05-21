@@ -127,7 +127,7 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 				: > "${STEAM_ONCE}"
 				touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
 				if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-					/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait &
+					/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force &
 				fi
 			fi
 		fi
@@ -150,10 +150,45 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null && [ ! -f "${STEAM_ONCE}" ]; t
 	fi
 fi
 
-# Installed disk: notify when Steam is idle (reboot + controller + :8844 web tips).
+# Installed disk: reboot notice when Steam setup completes (quit Steam) or --force while signed in.
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
 	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
 	/usr/share/gamebian/gamebian-openbox-notify.sh &
+fi
+# loginusers.vdf can appear while Steam is still on the sign-in screen — poll and notify with --force.
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
+	&& [ ! -f "${HOME}/.config/gamebian-firstboot-steam.done" ] \
+	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+	(
+		export DISPLAY="${DISPLAY:-:0}"
+		export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+		export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+		_poll=0
+		while [ "${_poll}" -lt 120 ]; do
+			if [ -f "${HOME}/.config/gamebian-firstboot-steam.done" ]; then
+				break
+			fi
+			_has_login=""
+			if command -v gamebian_have_loginusers_vdf >/dev/null 2>&1 && gamebian_have_loginusers_vdf; then
+				_has_login=1
+			elif [ -f "${STEAM_DATA}/config/loginusers.vdf" ] \
+				|| [ -f "${HOME}/.steam/debian-installation/config/loginusers.vdf" ]; then
+				_has_login=1
+			fi
+			if [ "${_has_login}" = 1 ]; then
+				if command -v sudo >/dev/null 2>&1 \
+					&& sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
+					mkdir -p "${HOME}/.config"
+					: > "${HOME}/.config/gamebian-firstboot-steam.done"
+					touch "${HOME}/.config/gamebian-firstboot-steam.run-finished"
+				fi
+				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --force
+				break
+			fi
+			sleep 5
+			_poll=$((_poll + 1))
+		done
+	) &
 fi
 
 # Calamares only on live session

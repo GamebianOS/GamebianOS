@@ -82,14 +82,24 @@ case "${2:-}${1:-}" in
 esac
 [ "${1:-}" = "--force" ] && _force=1
 
-log "start DISPLAY=${DISPLAY} dbus=${DBUS_SESSION_BUS_ADDRESS} arg1=${1:-} arg2=${2:-}"
+log "start DISPLAY=${DISPLAY} dbus=${DBUS_SESSION_BUS_ADDRESS} arg1=${1:-} arg2=${2:-} force=${_force}"
+
+# Setup complete (loginusers.vdf or first-boot markers). Default: wait until Steam exits so the
+# bubble is not hidden behind the client. --force: show while Steam is still open (login screen).
+_gamebian_reboot_notice_ready() {
+	gamebian_steam_needs_reboot_notice || return 1
+	if [ "${_force}" -eq 1 ]; then
+		return 0
+	fi
+	gamebian_steam_install_idle
+}
 
 _wait_for_steam_ready() {
 	_elapsed=0
 	_max=7200
 	while [ "${_elapsed}" -lt "${_max}" ]; do
-		if gamebian_steam_needs_reboot_notice && gamebian_steam_install_idle; then
-			log "steam ready (elapsed=${_elapsed})"
+		if _gamebian_reboot_notice_ready; then
+			log "reboot notice ready (elapsed=${_elapsed} force=${_force})"
 			return 0
 		fi
 		if gamebian_steam_process_busy; then
@@ -106,8 +116,8 @@ if [ "${_no_wait}" -eq 0 ]; then
 	_wait_for_steam_ready || exit 0
 fi
 
-if ! gamebian_steam_needs_reboot_notice || ! gamebian_steam_install_idle; then
-	log "skip: needs_notice=$(gamebian_steam_needs_reboot_notice 2>/dev/null; echo $?) idle=$(gamebian_steam_install_idle 2>/dev/null; echo $?)"
+if ! _gamebian_reboot_notice_ready; then
+	log "skip: needs_notice=$(gamebian_steam_needs_reboot_notice 2>/dev/null; echo $?) idle=$(gamebian_steam_install_idle 2>/dev/null; echo $?) force=${_force}"
 	exit 0
 fi
 
