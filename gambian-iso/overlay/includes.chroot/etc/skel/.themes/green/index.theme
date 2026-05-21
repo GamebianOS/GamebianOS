@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Green
+Comment=Gamebian Green theme (#55f201)
+
+[X-GNOME-Metatheme]
+GtkTheme=green
+
+[X-Gnome-Metatheme]
+GtkTheme=green

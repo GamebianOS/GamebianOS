@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Blue
+Comment=Gamebian Blue theme (#0145f2)
+
+[X-GNOME-Metatheme]
+GtkTheme=blue
+
+[X-Gnome-Metatheme]
+GtkTheme=blue

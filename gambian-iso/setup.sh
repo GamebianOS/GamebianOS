@@ -51,6 +51,11 @@ fi
 if [[ -d "$OVERLAY/includes.chroot_before_packages" ]]; then
   cp -a "$OVERLAY/includes.chroot_before_packages/." config/includes.chroot_before_packages/
 fi
+# Branding palette color themes (green, yellow, blue, red, black, purple) under etc/skel/.themes/
+GEN_COLOR_THEMES="$SCRIPT_ROOT/../share/gamebian/generate-color-themes.py"
+if [[ -f "$GEN_COLOR_THEMES" ]] && command -v python3 >/dev/null 2>&1; then
+  python3 "$GEN_COLOR_THEMES"
+fi
 if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
 fi

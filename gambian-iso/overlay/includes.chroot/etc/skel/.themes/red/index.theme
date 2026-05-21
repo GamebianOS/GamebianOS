@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Red
+Comment=Gamebian Red theme (#f20135)
+
+[X-GNOME-Metatheme]
+GtkTheme=red
+
+[X-Gnome-Metatheme]
+GtkTheme=red

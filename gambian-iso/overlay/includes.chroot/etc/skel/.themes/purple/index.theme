@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Purple
+Comment=Gamebian Purple theme (#6e01a8)
+
+[X-GNOME-Metatheme]
+GtkTheme=purple
+
+[X-Gnome-Metatheme]
+GtkTheme=purple

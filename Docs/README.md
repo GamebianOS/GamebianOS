@@ -28,7 +28,7 @@ Paths below are **on the image** (overlay paths omit `Build/gambian-iso/overlay/
 
 | Path | Description |
 |------|-------------|
-| `/usr/local/bin/gamebian-controller-menu` | Launches Python gamepad quick-launcher (Guide / Home). |
+| `/usr/local/bin/gamebian-controller-menu` | Quick launcher (Super, Guide / Home, Select+Start); theme switcher (`~/.themes`: gamebian, gamebian-installed, green, yellow, blue, red, black, purple). |
 | `/usr/local/bin/gamebian-debug-boot-session` | Prints LightDM config, markers, gamescope status, logs; repair hints. |
 | `/usr/local/bin/gamebian-debug-lightdm-steam` | Alias for `gamebian-debug-boot-session --full`. |
 | `/usr/local/bin/gamebian-fix-steam-boot` | **Root repair:** enable Steam session, set markers, queue reboot notify. |

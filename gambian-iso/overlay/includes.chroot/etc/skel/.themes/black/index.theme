@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Black
+Comment=Gamebian Black theme (#000000)
+
+[X-GNOME-Metatheme]
+GtkTheme=black
+
+[X-Gnome-Metatheme]
+GtkTheme=black

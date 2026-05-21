@@ -1,0 +1,133 @@
+/* Gamebian theme: yellow (#f2ae01) */
+
+@define-color theme_bg_color #f2ae01;
+@define-color theme_fg_color #1a1a1a;
+@define-color theme_text_color #1a1a1a;
+@define-color theme_base_color #fff8e6;
+@define-color theme_view_hover_color #d49900;
+@define-color theme_selected_bg_color #dea000;
+@define-color theme_selected_fg_color #1a1a1a;
+@define-color insensitive_bg_color #bc8700;
+@define-color insensitive_fg_color #6a5a30;
+@define-color borders #bc8700;
+@define-color wm_title #1a1a1a;
+@define-color wm_unfocused_title #6a5a30;
+
+.background,
+window.background {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+headerbar.titlebar {
+  background: linear-gradient(180deg, @theme_view_hover_color 0%, @theme_bg_color 100%);
+  color: @theme_fg_color;
+  border-bottom: 1px solid @borders;
+}
+
+button {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+  border: 1px solid @borders;
+}
+
+button:hover {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+notebook header {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+notebook header tabs tab {
+  padding: 8px 16px;
+  margin: 0 3px;
+  min-height: 1.2em;
+}
+
+notebook header tabs tab label {
+  padding: 2px 4px;
+}
+
+notebook header tabs tab:checked {
+  background-color: @theme_view_hover_color;
+  color: @theme_selected_fg_color;
+}
+
+scrollbar slider {
+  background-color: @theme_view_hover_color;
+  border: 1px solid @borders;
+}
+
+scrollbar trough {
+  background-color: @theme_bg_color;
+}
+
+popover,
+popover.background,
+menu {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+menuitem:hover,
+menu menuitem:hover {
+  background-color: @theme_view_hover_color;
+  color: @theme_selected_fg_color;
+}
+
+menubar {
+  padding: 2px 4px;
+}
+
+menubar > menuitem {
+  padding: 6px 12px;
+}
+
+menubar > menuitem:hover {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+}
+
+menu menuitem {
+  padding: 6px 16px;
+  min-height: 1.5em;
+}
+
+.view,
+viewport view {
+  background-color: @theme_base_color;
+  color: #5a4200;
+}
+
+.view:selected,
+.view:selected:focus {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+calendar {
+  background-color: @theme_base_color;
+  color: #5a4200;
+}
+
+calendar.header {
+  background-color: @theme_bg_color;
+  color: @theme_fg_color;
+}
+
+calendar.button {
+  background-color: @theme_view_hover_color;
+  color: @theme_fg_color;
+}
+
+calendar:selected {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+}
+
+calendar:indeterminate {
+  color: @insensitive_fg_color;
+}

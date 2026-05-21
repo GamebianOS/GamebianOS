@@ -7,8 +7,15 @@ gamebian_tray_env() {
 	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 	export GTK_ICON_THEME="${GTK_ICON_THEME:-Papirus}"
-	export GTK_THEME="${GTK_THEME:-gamebian-installed}"
-	if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	if [ -r "${HOME}/.config/gamebian/desktop-theme" ]; then
+		read -r _gb_theme < "${HOME}/.config/gamebian/desktop-theme" || _gb_theme=""
+		[ -n "${_gb_theme}" ] && export GTK_THEME="${_gb_theme}"
+	fi
+	if [ -z "${GTK_THEME:-}" ]; then
+		export GTK_THEME=gamebian-installed
+	fi
+	if grep -qw boot=live /proc/cmdline 2>/dev/null \
+		&& [ ! -r "${HOME}/.config/gamebian/desktop-theme" ]; then
 		export GTK_THEME=gamebian
 	fi
 	export QT_QPA_PLATFORMTHEME=gtk3

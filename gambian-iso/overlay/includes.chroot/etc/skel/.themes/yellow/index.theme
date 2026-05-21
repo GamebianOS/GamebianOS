@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=Yellow
+Comment=Gamebian Yellow theme (#f2ae01)
+
+[X-GNOME-Metatheme]
+GtkTheme=yellow
+
+[X-Gnome-Metatheme]
+GtkTheme=yellow

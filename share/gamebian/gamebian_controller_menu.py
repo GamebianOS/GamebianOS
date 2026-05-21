@@ -88,6 +88,9 @@ COMMAND_ICON_HINTS: dict[str, str] = {
     "epiphany": "epiphany",
     "firefox": "firefox",
 }
+THEME_COMMAND_PREFIX = "__gamebian_theme__:"
+DESKTOP_THEME_FILE = Path.home() / ".config" / "gamebian" / "desktop-theme"
+THEME_ICON = "preferences-desktop-theme"
 
 
 def _config_paths() -> list[Path]:
@@ -112,6 +115,8 @@ def load_config() -> configparser.ConfigParser:
         cfg.add_section("programs")
     if not cfg.has_section("ui"):
         cfg.add_section("ui")
+    if not cfg.has_section("themes"):
+        cfg.add_section("themes")
     return cfg
 
 
@@ -292,6 +297,189 @@ def _is_joystick_capabilities(dev: evdev.InputDevice) -> bool:
     return any(k in keys for k in gamepad_markers)
 
 
+def _is_trigger_capable_device(dev: evdev.InputDevice) -> bool:
+    """Gamepads (Guide / Select+Start) and keyboards (Super / Home)."""
+    caps = dev.capabilities()
+    keys = caps.get(evdev.ecodes.EV_KEY, [])
+    if not keys:
+        return False
+    if _is_joystick_capabilities(dev):
+        return True
+    keyboard_triggers = (
+        ecodes.KEY_LEFTMETA,
+        ecodes.KEY_RIGHTMETA,
+        ecodes.KEY_HOMEPAGE,
+    )
+    return any(k in keys for k in keyboard_triggers)
+
+
+def _theme_display_name(theme_dir: Path) -> str:
+    idx = theme_dir / "index.theme"
+    if idx.is_file():
+        try:
+            for line in idx.read_text(encoding="utf-8", errors="replace").splitlines():
+                if line.startswith("Name="):
+                    return line.split("=", 1)[1].strip()
+        except OSError:
+            pass
+    return theme_dir.name.replace("-", " ").title()
+
+
+def discover_user_themes() -> list[tuple[str, str]]:
+    """GTK/Openbox theme ids under ~/.themes (from skel: gamebian, gamebian-installed)."""
+    themes_dir = Path.home() / ".themes"
+    if not themes_dir.is_dir():
+        return []
+    found: list[tuple[str, str]] = []
+    for theme_dir in sorted(themes_dir.iterdir()):
+        if not theme_dir.is_dir():
+            continue
+        theme_id = theme_dir.name
+        if theme_id.startswith("."):
+            continue
+        has_gtk = (theme_dir / "gtk-3.0").is_dir() or (theme_dir / "gtk-2.0").is_dir()
+        has_ob = (theme_dir / "openbox-3").is_dir()
+        if not has_gtk and not has_ob:
+            continue
+        found.append((theme_id, _theme_display_name(theme_dir)))
+    return found
+
+
+def _write_gtk3_theme(theme_id: str) -> None:
+    path = Path.home() / ".config" / "gtk-3.0" / "settings.ini"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cfg = configparser.ConfigParser()
+    if path.is_file():
+        cfg.read(path, encoding="utf-8")
+    if not cfg.has_section("Settings"):
+        cfg.add_section("Settings")
+    cfg.set("Settings", "gtk-theme-name", theme_id)
+    with path.open("w", encoding="utf-8") as fh:
+        cfg.write(fh)
+
+
+def _write_gtk2_theme(theme_id: str) -> None:
+    path = Path.home() / ".gtkrc-2.0"
+    lines: list[str] = []
+    if path.is_file():
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    out: list[str] = []
+    replaced = False
+    for line in lines:
+        if line.strip().startswith("gtk-theme-name"):
+            out.append(f'gtk-theme-name = "{theme_id}"')
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.insert(0, f'gtk-theme-name = "{theme_id}"')
+    path.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def _write_openbox_theme(theme_id: str) -> None:
+    rc = Path.home() / ".config" / "openbox" / "rc.xml"
+    if not rc.is_file():
+        return
+    try:
+        text = rc.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    new_text, n = re.subn(
+        r"(<theme>\s*<name>)[^<]+(</name>)",
+        rf"\g<1>{theme_id}\g<2>",
+        text,
+        count=1,
+    )
+    if n:
+        rc.write_text(new_text, encoding="utf-8")
+
+
+def _write_rofi_theme(theme_id: str) -> None:
+    rofi_cfg = Path.home() / ".config" / "rofi" / "config.rasi"
+    theme_name = "gamebian-live" if theme_id == "gamebian" else "gamebian"
+    rofi_cfg.parent.mkdir(parents=True, exist_ok=True)
+    rofi_cfg.write_text(f'@theme "{theme_name}"\n', encoding="utf-8")
+
+
+def _persist_desktop_theme(theme_id: str) -> None:
+    DESKTOP_THEME_FILE.parent.mkdir(parents=True, exist_ok=True)
+    DESKTOP_THEME_FILE.write_text(theme_id + "\n", encoding="utf-8")
+
+
+def _refresh_wallpaper(theme_id: str, env: dict[str, str]) -> None:
+    if theme_id in ("gamebian-installed", "black"):
+        wall = Path("/usr/share/backgrounds/gamebian-installed/background.png")
+    else:
+        wall = Path.home() / ".local" / "share" / "gamebian" / "background.png"
+    if not wall.is_file():
+        return
+    try:
+        subprocess.Popen(
+            ["feh", "--no-fehbg", "--bg-fill", str(wall)],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        pass
+
+
+def apply_desktop_theme(theme_id: str) -> None:
+    """Apply ~/.themes/<id> to GTK, Openbox, wallpaper, and lxpanel."""
+    theme_dir = Path.home() / ".themes" / theme_id
+    if not theme_dir.is_dir():
+        notify_user("Theme not found", theme_id)
+        return
+    env = _launch_env()
+    env["GTK_THEME"] = theme_id
+    _write_gtk3_theme(theme_id)
+    _write_gtk2_theme(theme_id)
+    _write_openbox_theme(theme_id)
+    _write_rofi_theme(theme_id)
+    _persist_desktop_theme(theme_id)
+    try:
+        subprocess.run(
+            ["openbox", "--reconfigure"],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=8,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    _refresh_wallpaper(theme_id, env)
+    try:
+        subprocess.run(
+            ["pkill", "-x", "lxpanel"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        )
+        subprocess.Popen(
+            ["lxpanel"],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except OSError:
+        pass
+    notify_user("Theme applied", _theme_display_name(theme_dir))
+
+
+def theme_menu_items(cfg: configparser.ConfigParser) -> list[tuple[str, str, Path | None]]:
+    if not cfg.getboolean("themes", "enabled", fallback=True):
+        return []
+    icon_path = resolve_icon_file(THEME_ICON)
+    out: list[tuple[str, str, Path | None]] = []
+    for theme_id, display in discover_user_themes():
+        label = f"Theme — {display}"
+        cmd = f"{THEME_COMMAND_PREFIX}{theme_id}"
+        out.append((label, cmd, icon_path))
+    return out
+
+
 def discover_devices(opened: dict[str, evdev.InputDevice]) -> None:
     for path in evdev.list_devices():
         if path in opened:
@@ -300,7 +488,7 @@ def discover_devices(opened: dict[str, evdev.InputDevice]) -> None:
             dev = evdev.InputDevice(path)
         except OSError:
             continue
-        if not _is_joystick_capabilities(dev):
+        if not _is_trigger_capable_device(dev):
             dev.close()
             continue
         try:
@@ -321,8 +509,9 @@ def close_removed(opened: dict[str, evdev.InputDevice]) -> None:
 
 
 class TriggerState:
-    def __init__(self, mode: str) -> None:
+    def __init__(self, mode: str, keyboard_super: bool = True) -> None:
         self.mode = (mode or "guide").strip().lower()
+        self.keyboard_super = keyboard_super
         self.select_down = False
         self.start_down = False
         self._last_fire = 0.0
@@ -368,6 +557,12 @@ class TriggerState:
 
         guide_keys = (ecodes.BTN_MODE, ecodes.KEY_HOMEPAGE)
         if key in guide_keys and val == 1 and self._debounced():
+            self.reset_combo()
+            return True
+        if self.keyboard_super and key in (
+            ecodes.KEY_LEFTMETA,
+            ecodes.KEY_RIGHTMETA,
+        ) and val == 1 and self._debounced():
             self.reset_combo()
             return True
         return False
@@ -510,7 +705,7 @@ class MenuApp:
         ).pack(fill=tk.X)
         tk.Label(
             title_col,
-            text="Quick launch — Guide / Mode, or Select+Start",
+            text="Quick launch — Super, Guide / Mode, or Select+Start",
             fg=theme["subtitle"],
             bg=theme["panel"],
             font=("Sans", 14),
@@ -558,7 +753,7 @@ class MenuApp:
 
         tk.Label(
             self.root,
-            text="D-pad: navigate   A / Start: launch   B / Guide: close",
+            text="D-pad / arrows: navigate   A / Start / Enter: launch   B / Guide / Esc: close",
             fg=theme["hint"],
             bg=theme["window"],
             font=("Sans", 14),
@@ -594,6 +789,11 @@ class MenuApp:
             return
         label, cmd, _icon = self.items[self._selected]
         self.dismiss()
+        if cmd.startswith(THEME_COMMAND_PREFIX):
+            theme_id = cmd[len(THEME_COMMAND_PREFIX) :].strip()
+            if theme_id:
+                apply_desktop_theme(theme_id)
+            return
         if is_steam_menu_entry(label, cmd) and in_exclusive_gamescope_kiosk():
             notify_user("Please Wait", "Steam will not load in gamescope session")
             return
@@ -663,14 +863,18 @@ class MenuApp:
 def run() -> None:
     cfg = load_config()
     items = programs_from_config(cfg)
+    items.extend(theme_menu_items(cfg))
     if not items:
         print(
             "gamebian-controller-menu: no [programs] in config; "
             "see /etc/gamebian/controller-menu.ini",
-            file=sys.stderr,
+            file=        sys.stderr,
         )
 
-    trigger = TriggerState(cfg.get("trigger", "mode", fallback="guide"))
+    trigger = TriggerState(
+        cfg.get("trigger", "mode", fallback="guide"),
+        cfg.getboolean("trigger", "keyboard_super", fallback=True),
+    )
     opened: dict[str, evdev.InputDevice] = {}
     discover_devices(opened)
 
@@ -714,7 +918,10 @@ def run() -> None:
                 ui_icon = resolve_menu_icon(cfg)
                 ui_title = cfg.get("ui", "title", fallback="Gamebian").strip() or "Gamebian"
                 MenuApp(items, opened, ui_theme, ui_icon, ui_title).root.mainloop()
-            trigger = TriggerState(cfg.get("trigger", "mode", fallback="guide"))
+            trigger = TriggerState(
+                cfg.get("trigger", "mode", fallback="guide"),
+                cfg.getboolean("trigger", "keyboard_super", fallback=True),
+            )
 
 
 if __name__ == "__main__":

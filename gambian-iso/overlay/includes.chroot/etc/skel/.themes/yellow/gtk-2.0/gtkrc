@@ -1,0 +1,40 @@
+# Gamebian GTK2 — yellow
+
+style "yellow-default" {
+  fg[NORMAL]       = "#1a1a1a"
+  fg[PRELIGHT]     = "#1a1a1a"
+  fg[ACTIVE]       = "#1a1a1a"
+  fg[SELECTED]     = "#1a1a1a"
+  fg[INSENSITIVE]  = "#6a5a30"
+
+  bg[NORMAL]       = "#f2ae01"
+  bg[PRELIGHT]     = "#d49900"
+  bg[ACTIVE]       = "#dea000"
+  bg[SELECTED]     = "#dea000"
+  bg[INSENSITIVE]  = "#bc8700"
+
+  base[NORMAL]     = "#fff8e6"
+  base[PRELIGHT]   = "#fff8e6"
+  base[ACTIVE]     = "#dea000"
+  base[SELECTED]   = "#dea000"
+  base[INSENSITIVE]= "#bc8700"
+
+  text[NORMAL]     = "#5a4200"
+  text[PRELIGHT]   = "#5a4200"
+  text[ACTIVE]     = "#1a1a1a"
+  text[SELECTED]   = "#1a1a1a"
+  text[INSENSITIVE]= "#6a5a30"
+
+  font_name = "Sans 9"
+}
+
+class "GtkWidget" style "yellow-default"
+
+style "yellow-notebook" = "yellow-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "yellow-notebook"
+
+gtk-icon-theme-name = "Papirus"

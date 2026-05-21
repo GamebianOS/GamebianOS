@@ -1,0 +1,105 @@
+!# red — Openbox 3 (#f20135)
+
+*.font: shadow=n
+window.active.label.text.font: shadow=n
+window.inactive.label.text.font: shadow=n
+menu.items.font: shadow=n
+
+border.width: 1
+padding.width: 4
+padding.height: 3
+window.handle.width: 2
+window.client.padding.width: 0
+menu.overlap: 2
+*.justify: left
+
+window.active.border.color: #3d3d3d
+window.inactive.border.color: #3d3d3d
+window.active.client.color: #242424
+window.inactive.client.color: #242424
+
+window.active.title.separator.color: #3d3d3d
+window.inactive.title.separator.color: #3d3d3d
+
+window.active.label.text.color: #eeeeec
+window.inactive.label.text.color: #929292
+
+window.active.title.bg: flat solid
+window.active.title.bg.color: #242424
+window.active.label.bg: parentrelative
+window.inactive.title.bg: flat solid
+window.inactive.title.bg.color: #242424
+window.inactive.label.bg: parentrelative
+
+window.active.handle.bg: flat solid
+window.active.handle.bg.color: #242424
+window.inactive.handle.bg: flat solid
+window.inactive.handle.bg.color: #242424
+window.active.grip.bg: flat solid
+window.active.grip.bg.color: #242424
+window.inactive.grip.bg: flat solid
+window.inactive.grip.bg.color: #242424
+
+window.active.button.unpressed.bg: parentrelative
+window.active.button.unpressed.image.color: #eeeeec
+window.active.button.hover.bg: flat solid
+window.active.button.hover.bg.color: #3d3d3d
+window.active.button.hover.image.color: #eeeeec
+window.active.button.pressed.bg: flat solid
+window.active.button.pressed.bg.color: #c1002a
+window.active.button.pressed.image.color: #ffffff
+window.active.button.disabled.bg: parentrelative
+window.active.button.disabled.image.color: #929292
+
+window.inactive.button.unpressed.bg: parentrelative
+window.inactive.button.unpressed.image.color: #929292
+window.inactive.button.hover.bg: flat solid
+window.inactive.button.hover.bg.color: #3d3d3d
+window.inactive.button.hover.image.color: #eeeeec
+window.inactive.button.pressed.bg: flat solid
+window.inactive.button.pressed.bg.color: #c1002a
+window.inactive.button.pressed.image.color: #ffffff
+
+window.active.button.close.hover.bg: flat solid
+window.active.button.close.hover.bg.color: #c01c28
+window.active.button.close.hover.image.color: #ffffff
+
+window.inactive.button.close.hover.bg: flat solid
+window.inactive.button.close.hover.bg.color: #8b1922
+window.inactive.button.close.hover.image.color: #eeeeec
+
+menu.border.width: 1
+menu.border.color: #3d3d3d
+menu.overlap.x: 0
+menu.overlap.y: 0
+
+menu.title.bg: flat solid
+menu.title.bg.color: #242424
+menu.title.text.color: #eeeeec
+
+menu.items.bg: flat solid
+menu.items.bg.color: #383838
+menu.items.text.color: #eeeeec
+menu.items.disabled.text.color: #929292
+
+menu.items.active.bg: flat solid
+menu.items.active.bg.color: #f20135
+menu.items.active.text.color: #ffffff
+
+menu.separator.width: 1
+menu.separator.padding.width: 4
+menu.separator.padding.height: 4
+menu.separator.color: #3d3d3d
+
+osd.border.width: 1
+osd.border.color: #3d3d3d
+osd.label.text.color: #eeeeec
+
+osd.bg: flat solid
+osd.bg.color: #242424
+osd.label.bg: parentrelative
+
+osd.hilight.bg: flat solid
+osd.hilight.bg.color: #f20135
+osd.unhilight.bg: flat solid
+osd.unhilight.bg.color: #3d3d3d

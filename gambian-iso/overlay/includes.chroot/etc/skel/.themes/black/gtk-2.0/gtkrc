@@ -1,0 +1,40 @@
+# Gamebian GTK2 — black
+
+style "black-default" {
+  fg[NORMAL]       = "#ebebeb"
+  fg[PRELIGHT]     = "#ebebeb"
+  fg[ACTIVE]       = "#ffffff"
+  fg[SELECTED]     = "#ffffff"
+  fg[INSENSITIVE]  = "#888888"
+
+  bg[NORMAL]       = "#151515"
+  bg[PRELIGHT]     = "#2d2d2d"
+  bg[ACTIVE]       = "#3a3a3a"
+  bg[SELECTED]     = "#3a3a3a"
+  bg[INSENSITIVE]  = "#141414"
+
+  base[NORMAL]     = "#202020"
+  base[PRELIGHT]   = "#202020"
+  base[ACTIVE]     = "#3a3a3a"
+  base[SELECTED]   = "#3a3a3a"
+  base[INSENSITIVE]= "#141414"
+
+  text[NORMAL]     = "#ebebeb"
+  text[PRELIGHT]   = "#ebebeb"
+  text[ACTIVE]     = "#ffffff"
+  text[SELECTED]   = "#ffffff"
+  text[INSENSITIVE]= "#888888"
+
+  font_name = "Sans 9"
+}
+
+class "GtkWidget" style "black-default"
+
+style "black-notebook" = "black-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "black-notebook"
+
+gtk-icon-theme-name = "Papirus"
