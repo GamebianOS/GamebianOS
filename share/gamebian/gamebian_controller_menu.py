@@ -70,29 +70,42 @@ DESKTOP_DIRS = (
 ICON_THEME_DIRS = (Path("/usr/share/icons"), Path.home() / ".icons")
 ICON_SIZE_DIRS = ("48x48", "32x32", "64x64", "24x24", "22x22", "16x16")
 ICON_SUBDIRS = ("apps", "places", "devices", "mimetypes", "status", "actions", "categories")
+THEME_COMMAND_PREFIX = "__gamebian_theme__:"
+THEMES_SUBMENU_CMD = "__gamebian_themes_submenu__"
+DESKTOP_THEME_FILE = Path.home() / ".config" / "gamebian" / "desktop-theme"
+THEME_ICON = "preferences-desktop-theme"
+COLOR_THEME_IDS = frozenset({"green", "yellow", "blue", "red", "black", "purple"})
+COLOR_THEME_ORDER = ("green", "yellow", "blue", "red", "purple", "black")
+COLOR_THEME_LABELS = {
+    "green": "Green",
+    "yellow": "Yellow",
+    "blue": "Blue",
+    "red": "Red",
+    "purple": "Purple",
+    "black": "Black",
+}
+INSTALLED_WALLPAPER_DIR = Path("/usr/share/backgrounds/gamebian-installed")
 # Fallback Papirus / Freedesktop names when .desktop lookup fails.
 PROGRAM_ICON_HINTS: dict[str, str] = {
     "steam": "steam",
-    "files": "thunar",
-    "terminal": "utilities-terminal",
-    "applications": "view-grid",
-    "browser": "web-browser",
+    "themes": "preferences-desktop-theme",
+    "log out": "system-log-out",
+    "logout": "system-log-out",
+    "reboot": "system-reboot",
+    "shut down": "system-shutdown",
+    "shutdown": "system-shutdown",
 }
 COMMAND_ICON_HINTS: dict[str, str] = {
     "steam": "steam",
     "gamebian-enter-steam-kiosk-session": "steam",
-    "thunar": "thunar",
+    THEMES_SUBMENU_CMD: "preferences-desktop-theme",
+    "gamebian-session-action": "system-shutdown",
     "xfce4-terminal": "utilities-terminal",
     "rofi": "view-grid",
     "x-www-browser": "web-browser",
     "epiphany": "epiphany",
     "firefox": "firefox",
 }
-THEME_COMMAND_PREFIX = "__gamebian_theme__:"
-DESKTOP_THEME_FILE = Path.home() / ".config" / "gamebian" / "desktop-theme"
-THEME_ICON = "preferences-desktop-theme"
-COLOR_THEME_IDS = frozenset({"green", "yellow", "blue", "red", "black", "purple"})
-INSTALLED_WALLPAPER_DIR = Path("/usr/share/backgrounds/gamebian-installed")
 
 
 def _config_paths() -> list[Path]:
@@ -451,6 +464,11 @@ def _write_rofi_theme(theme_id: str) -> None:
 def _persist_desktop_theme(theme_id: str) -> None:
     DESKTOP_THEME_FILE.parent.mkdir(parents=True, exist_ok=True)
     DESKTOP_THEME_FILE.write_text(theme_id + "\n", encoding="utf-8")
+    custom = Path.home() / ".config" / "gamebian" / "custom-wallpaper"
+    try:
+        custom.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _refresh_wallpaper(theme_id: str, env: dict[str, str]) -> None:
@@ -512,16 +530,29 @@ def apply_desktop_theme(theme_id: str) -> None:
     notify_user("Theme applied", _theme_display_name(theme_dir))
 
 
-def theme_menu_items(cfg: configparser.ConfigParser) -> list[tuple[str, str, Path | None]]:
+def color_theme_submenu_items(cfg: configparser.ConfigParser) -> list[tuple[str, str, Path | None]]:
     if not cfg.getboolean("themes", "enabled", fallback=True):
         return []
-    icon_path = resolve_icon_file(THEME_ICON)
+    if _boot_live():
+        return []
+    themes_dir = Path.home() / ".themes"
     out: list[tuple[str, str, Path | None]] = []
-    for theme_id, display in discover_user_themes():
-        label = f"Theme — {display}"
+    for theme_id in COLOR_THEME_ORDER:
+        if theme_id not in COLOR_THEME_IDS:
+            continue
+        if not (themes_dir / theme_id).is_dir():
+            continue
+        preview = _wallpaper_path(theme_id)
+        label = COLOR_THEME_LABELS.get(theme_id, theme_id.title())
         cmd = f"{THEME_COMMAND_PREFIX}{theme_id}"
-        out.append((label, cmd, icon_path))
+        out.append((label, cmd, preview))
     return out
+
+
+def is_themes_submenu_entry(label: str, command: str) -> bool:
+    if command.strip() == THEMES_SUBMENU_CMD:
+        return True
+    return label.strip().lower() == "themes"
 
 
 def discover_devices(opened: dict[str, evdev.InputDevice]) -> None:
@@ -627,6 +658,129 @@ def steam_is_running() -> bool:
         return False
 
 
+def openbox_running() -> bool:
+    """True when the Openbox desktop session is active for this user."""
+    uid = os.getuid()
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-u", str(uid), "-x", "openbox"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _primary_ip() -> str:
+    try:
+        proc = subprocess.run(
+            ["ip", "-4", "route", "get", "1.1.1.1"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0:
+            parts = proc.stdout.split()
+            for i, part in enumerate(parts):
+                if part == "src" and i + 1 < len(parts):
+                    return parts[i + 1]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        proc = subprocess.run(
+            ["hostname", "-I"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.split()[0]
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def _steam_process_uses_gamepadui() -> bool:
+    """Steam launched with -gamepadui / tenfoot (Big Picture on the desktop)."""
+    uid = os.getuid()
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-u", str(uid), "-af", "steam"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return False
+    for line in proc.stdout.splitlines():
+        low = line.lower()
+        if "gamepadui" in low or "-tenfoot" in low or "tenfoot_enable" in low:
+            return True
+    return False
+
+
+def _steam_bigpicture_window_visible() -> bool:
+    env = _launch_env()
+    try:
+        proc = subprocess.run(
+            ["wmctrl", "-l"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            env=env,
+        )
+        if proc.returncode == 0:
+            for line in proc.stdout.splitlines():
+                if "big picture" in line.lower() or "steam big picture" in line.lower():
+                    return True
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        proc = subprocess.run(
+            ["xdotool", "search", "--name", "Big Picture"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            env=env,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return True
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return False
+
+
+def steam_bigpicture_on_openbox() -> bool:
+    """Steam Big Picture on the Openbox desktop (conflicts with the controller menu)."""
+    if _boot_live() or not openbox_running():
+        return False
+    if in_exclusive_gamescope_kiosk():
+        return False
+    if not steam_is_running():
+        return False
+    return _steam_process_uses_gamepadui() or _steam_bigpicture_window_visible()
+
+
+def desktop_session_header_subtitle() -> str:
+    """Hints shown at the top of the controller menu on installed Openbox sessions."""
+    if _boot_live() or not openbox_running():
+        return "Quick launch — Super, Guide / Mode, or Select+Start"
+    ip = _primary_ip()
+    web = "http://127.0.0.1:8844"
+    if ip:
+        web = f"{web} or http://{ip}:8844"
+    return (
+        "Welcome to desktop mode.\n"
+        "Please logout or reboot to load your Steam/Gamescope session "
+        "(after Steam is installed and you are signed in).\n"
+        f"Visit {web} to upload games."
+    )
+
+
 def in_exclusive_gamescope_kiosk() -> bool:
     """True when fullscreen gamescope is active without Openbox (Steam kiosk session)."""
     uid = os.getuid()
@@ -690,6 +844,8 @@ def programs_from_config(
         cmd = cfg.get("programs", label, fallback="").strip()
         if not cmd:
             continue
+        if _boot_live() and cmd == THEMES_SUBMENU_CMD:
+            continue
         icon_path = resolve_program_icon(label, cmd, cfg)
         out.append((label, cmd, icon_path))
     return out
@@ -703,10 +859,17 @@ class MenuApp:
         theme: dict[str, str],
         icon_path: Path | None,
         title: str,
+        *,
+        cfg: configparser.ConfigParser | None = None,
+        header_subtitle: str = "Quick launch — Super, Guide / Mode, or Select+Start",
+        footer_hint: str = "D-pad / arrows: navigate   A / Start / Enter: launch   B / Guide / Esc: close",
+        item_icon_px: int = 40,
     ) -> None:
         self.items = items
         self.devices = devices
         self._theme = theme
+        self._cfg = cfg
+        self._item_icon_px = item_icon_px
         self._selected = 0
         self._row_frames: list[tk.Frame] = []
         self._row_text_labels: list[tk.Label] = []
@@ -749,11 +912,13 @@ class MenuApp:
         ).pack(fill=tk.X)
         tk.Label(
             title_col,
-            text="Quick launch — Super, Guide / Mode, or Select+Start",
+            text=header_subtitle,
             fg=theme["subtitle"],
             bg=theme["panel"],
             font=("Sans", 14),
             anchor="w",
+            justify=tk.LEFT,
+            wraplength=920,
         ).pack(fill=tk.X, pady=(4, 0))
 
         list_wrap = tk.Frame(
@@ -770,7 +935,7 @@ class MenuApp:
         for label, _cmd, item_icon in items:
             row = tk.Frame(list_inner, bg=theme["list_bg"])
             row.pack(fill=tk.X, pady=3)
-            photo = load_tk_icon(item_icon, max_px=40)
+            photo = load_tk_icon(item_icon, max_px=self._item_icon_px)
             self._item_photos.append(photo)
             if photo is not None:
                 tk.Label(row, image=photo, bg=theme["list_bg"]).pack(
@@ -797,7 +962,7 @@ class MenuApp:
 
         tk.Label(
             self.root,
-            text="D-pad / arrows: navigate   A / Start / Enter: launch   B / Guide / Esc: close",
+            text=footer_hint,
             fg=theme["hint"],
             bg=theme["window"],
             font=("Sans", 14),
@@ -828,18 +993,44 @@ class MenuApp:
         self._selected = (self._selected + delta) % len(self.items)
         self._paint_selection()
 
+    def _open_themes_submenu(self) -> None:
+        cfg = self._cfg
+        devices = self.devices
+        ui = self._theme
+        self.dismiss()
+        if cfg is None:
+            return
+        sub_items = color_theme_submenu_items(cfg)
+        if not sub_items:
+            notify_user("Themes", "Color themes are available on installed disk only.")
+            return
+        MenuApp(
+            sub_items,
+            devices,
+            ui,
+            None,
+            "Themes",
+            cfg=cfg,
+            header_subtitle="Pick a desktop color — preview shows the wallpaper",
+            footer_hint="D-pad / arrows: navigate   A / Start: apply   B / Esc: back",
+            item_icon_px=88,
+        ).root.mainloop()
+
     def activate(self) -> None:
         if not self.items:
             return
         label, cmd, _icon = self.items[self._selected]
+        if is_themes_submenu_entry(label, cmd):
+            self._open_themes_submenu()
+            return
+        if is_steam_menu_entry(label, cmd) and in_exclusive_gamescope_kiosk():
+            notify_user("Already in Steam", "You are in the gamescope Steam session.")
+            return
         self.dismiss()
         if cmd.startswith(THEME_COMMAND_PREFIX):
             theme_id = cmd[len(THEME_COMMAND_PREFIX) :].strip()
             if theme_id:
                 apply_desktop_theme(theme_id)
-            return
-        if is_steam_menu_entry(label, cmd) and in_exclusive_gamescope_kiosk():
-            notify_user("Please Wait", "Steam will not load in gamescope session")
             return
         launch_env = _launch_env()
         log_dir = Path.home() / ".cache" / "gamebian"
@@ -907,12 +1098,11 @@ class MenuApp:
 def run() -> None:
     cfg = load_config()
     items = programs_from_config(cfg)
-    items.extend(theme_menu_items(cfg))
     if not items:
         print(
             "gamebian-controller-menu: no [programs] in config; "
             "see /etc/gamebian/controller-menu.ini",
-            file=        sys.stderr,
+            file=sys.stderr,
         )
 
     trigger = TriggerState(
@@ -952,16 +1142,35 @@ def run() -> None:
                 break
 
         if fired and items:
-            skip_if_steam = cfg.getboolean(
+            skip_steam_ui = cfg.getboolean(
                 "trigger",
                 "skip_when_steam_running",
                 fallback=True,
             )
-            if not skip_if_steam or not steam_is_running():
-                ui_theme = theme_from_config(cfg)
-                ui_icon = resolve_menu_icon(cfg)
-                ui_title = cfg.get("ui", "title", fallback="Gamebian").strip() or "Gamebian"
-                MenuApp(items, opened, ui_theme, ui_icon, ui_title).root.mainloop()
+            if skip_steam_ui and in_exclusive_gamescope_kiosk():
+                trigger = TriggerState(
+                    cfg.get("trigger", "mode", fallback="guide"),
+                    cfg.getboolean("trigger", "keyboard_super", fallback=True),
+                )
+                continue
+            if skip_steam_ui and steam_bigpicture_on_openbox():
+                trigger = TriggerState(
+                    cfg.get("trigger", "mode", fallback="guide"),
+                    cfg.getboolean("trigger", "keyboard_super", fallback=True),
+                )
+                continue
+            ui_theme = theme_from_config(cfg)
+            ui_icon = resolve_menu_icon(cfg)
+            ui_title = cfg.get("ui", "title", fallback="Gamebian").strip() or "Gamebian"
+            MenuApp(
+                items,
+                opened,
+                ui_theme,
+                ui_icon,
+                ui_title,
+                cfg=cfg,
+                header_subtitle=desktop_session_header_subtitle(),
+            ).root.mainloop()
             trigger = TriggerState(
                 cfg.get("trigger", "mode", fallback="guide"),
                 cfg.getboolean("trigger", "keyboard_super", fallback=True),

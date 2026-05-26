@@ -1,5 +1,5 @@
 # Gamebian Openbox session
-# GTK_THEME + GTK_ICON_THEME before lxpanel (nm-tray / blueman need this on disk installs).
+# GTK_THEME + GTK_ICON_THEME before lxpanel (nm-tray / blueman need Papirus-Dark on dark panel).
 if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
 	# shellcheck source=/usr/share/gamebian/gamebian-openbox-session-env.sh
 	. /usr/share/gamebian/gamebian-openbox-session-env.sh
@@ -16,26 +16,34 @@ if grep -qw boot=live /proc/cmdline 2>/dev/null \
 	sed -i 's|<name>gamebian-installed</name>|<name>gamebian</name>|' "${HOME}/.config/openbox/rc.xml"
 	( sleep 0.3 && openbox --reconfigure ) &
 fi
-# Wallpaper: live ~/background.png; installed uses color PNG matching saved desktop theme.
-if grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	wall="${HOME}/.local/share/gamebian/background.png"
+# Live ISO: design/*.png shipped to ~/ ; installed disk: theme or custom wallpaper
+if [ -r /usr/share/gamebian/gamebian-wallpaper.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-wallpaper.sh
+	. /usr/share/gamebian/gamebian-wallpaper.sh
+	gamebian_wallpaper_apply_resolved &
 else
-	_theme="gamebian-installed"
-	if [ -r "${HOME}/.config/gamebian/desktop-theme" ]; then
-		_theme="$(head -n1 "${HOME}/.config/gamebian/desktop-theme" | tr -d '[:space:]')"
+	wall="${HOME}/.local/share/gamebian/background.png"
+	if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
+		wall=/usr/share/backgrounds/gamebian-installed/background.png
+		[ ! -r "${wall}" ] && wall="${HOME}/.local/share/gamebian/background.png"
 	fi
-	case "${_theme}" in
-		green|yellow|blue|red|black|purple)
-			wall="/usr/share/backgrounds/gamebian-installed/${_theme}.png"
-			;;
-		*)
-			wall=/usr/share/backgrounds/gamebian-installed/background.png
-			;;
-	esac
-	if [ ! -r "${wall}" ]; then wall="${HOME}/.local/share/gamebian/background.png"; fi
+	if [ -r "${wall}" ]; then
+		feh --no-fehbg --bg-fill "${wall}" &
+	fi
 fi
-if [ -r "${wall}" ]; then
-	feh --no-fehbg --bg-fill "${wall}" &
+
+# Right-click desktop menu: session actions (logout / restart / reboot).
+if [ -r /usr/share/gamebian/openbox-menu.xml ] \
+	&& [ -f "${HOME}/.config/openbox/rc.xml" ] \
+	&& ! grep -q 'gamebian/openbox-menu.xml' "${HOME}/.config/openbox/rc.xml" 2>/dev/null; then
+	sed -i 's|<file>menu.xml</file>|<file>/usr/share/gamebian/openbox-menu.xml</file>|' \
+		"${HOME}/.config/openbox/rc.xml" 2>/dev/null \
+		|| true
+	if ! grep -q 'gamebian/openbox-menu.xml' "${HOME}/.config/openbox/rc.xml" 2>/dev/null; then
+		sed -i '/debian-menu.xml/a\  <file>/usr/share/gamebian/openbox-menu.xml</file>' \
+			"${HOME}/.config/openbox/rc.xml" 2>/dev/null || true
+	fi
+	openbox --reconfigure 2>/dev/null &
 fi
 
 # lxpanel layout: same panel config on live ISO vs disk (templates under /usr/share/gamebian/lxpanel/)
@@ -78,13 +86,20 @@ if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
 fi
 
-# Notification daemon (desktop tips before Steam is installed).
+# Notification daemon (must be up before Steam first-boot / openbox-notify scripts run).
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 if command -v xfce4-notifyd >/dev/null 2>&1 && ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
 	xfce4-notifyd >/dev/null 2>&1 &
 	sleep 1
 fi
+# Queued from steam-firstboot-terminal (terminal dbus may not reach notifyd).
+if [ -f "${HOME}/.config/gamebian/pending-openbox-notify" ] \
+	&& [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+	rm -f "${HOME}/.config/gamebian/pending-openbox-notify"
+	/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
+fi
+
 # Gamepad Guide (or Select+Start) → quick launcher (see /etc/gamebian/controller-menu.ini).
 if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	if command -v systemctl >/dev/null 2>&1; then
@@ -99,28 +114,42 @@ if command -v gamebian-controller-menu >/dev/null 2>&1; then
 	fi
 fi
 
-# Installed disk — before Steam package: desktop tips + optional first-boot terminal.
-if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
-	# shellcheck source=/usr/share/gamebian/gamebian-steam-ready.sh
-	. /usr/share/gamebian/gamebian-steam-ready.sh
-fi
-if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
-	# shellcheck source=/usr/share/gamebian/gamebian-fix-steam-share.sh
-	. /usr/share/gamebian/gamebian-fix-steam-share.sh
-	gamebian_fix_steam_share
-fi
-if ! grep -qw boot=live /proc/cmdline 2>/dev/null \
-	&& ! gamebian_steam_binary_present 2>/dev/null; then
-	if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-		/usr/share/gamebian/gamebian-openbox-notify.sh &
+# Installed disk — every Openbox login: desktop notices; setup terminal until signed in.
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+		# shellcheck source=/usr/share/gamebian/gamebian-steam-ready.sh
+		. /usr/share/gamebian/gamebian-steam-ready.sh
 	fi
-	if ! gamebian_firstboot_done && command -v xfce4-terminal >/dev/null 2>&1 \
-		&& [ ! -f "${HOME}/.config/gamebian-firstboot-steam.prompted" ]; then
-		mkdir -p "${HOME}/.config"
-		: >"${HOME}/.config/gamebian-firstboot-steam.prompted"
-		( sleep 2 && xfce4-terminal \
-			--title="Install Steam" \
-			-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+	if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
+		# shellcheck source=/usr/share/gamebian/gamebian-fix-steam-share.sh
+		. /usr/share/gamebian/gamebian-fix-steam-share.sh
+		gamebian_fix_steam_share
+	fi
+	export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+	if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+		/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
+	fi
+	STEAM_PROMPTED="${HOME}/.config/gamebian-firstboot-steam.prompted"
+	_logged_in=0
+	if command -v gamebian_steam_logged_in >/dev/null 2>&1 \
+		&& gamebian_steam_logged_in 2>/dev/null; then
+		_logged_in=1
+	fi
+	if [ "${_logged_in}" -eq 0 ]; then
+		if command -v xfce4-terminal >/dev/null 2>&1 && [ ! -f "${STEAM_PROMPTED}" ]; then
+			mkdir -p "${HOME}/.config"
+			: > "${STEAM_PROMPTED}"
+			_steam_term_title="Steam setup"
+			if ! command -v steam >/dev/null 2>&1; then
+				_steam_term_title="Install Steam"
+			fi
+			( sleep 2 && xfce4-terminal \
+				--title="${_steam_term_title}" \
+				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' ) &
+		fi
+		if [ -x /usr/share/gamebian/gamebian-steam-reboot-notify-watcher.sh ]; then
+			/usr/share/gamebian/gamebian-steam-reboot-notify-watcher.sh &
+		fi
 	fi
 fi
 

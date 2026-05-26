@@ -13,6 +13,10 @@ if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	gamebian_session_log "gamebian-steam-gamescope" "ldm=${GAMEBIAN_LIGHTDM_SESSION} $*"
 fi
 
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
@@ -71,34 +75,23 @@ if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
 	set +a
 fi
 
-_force_steam=0
-case "${GAMEBIAN_LIGHTDM_SESSION}" in
-	gamebian-steam|gamebian-steam-gamescope) _force_steam=1 ;;
-esac
-
 _log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
 mkdir -p "$(dirname "$_log")" 2>/dev/null || true
-
-if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
-	printf '%s gamescope-session: prefer-openbox-desktop → openbox\n' \
-		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
-	exec /usr/bin/openbox-session
-fi
 
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	_have_steam=0
 	gamebian_steam_binary_present 2>/dev/null && _have_steam=1
+	_kiosk_ok=0
+	gamebian_steam_kiosk_ready 2>/dev/null && _kiosk_ok=1
 
-	if [ "${_have_steam}" -eq 0 ]; then
-		printf '%s gamescope-session: no steam binary, fallback openbox\n' \
-			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+	if [ "${_have_steam}" -eq 0 ] || [ "${_kiosk_ok}" -eq 0 ]; then
+		printf '%s gamescope-session: fallback openbox (steam=%s kiosk=%s ldm=%s)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" \
+			"${_have_steam}" "${_kiosk_ok}" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+		export DISPLAY="${DISPLAY:-:0}"
+		touch "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
 		exec /usr/bin/openbox-session
 	fi
-
-	# Steam is installed: always run gamescope kiosk (sign-in / updates happen in Steam UI).
-	_force_steam=1
-	printf '%s gamescope-session: steam installed — kiosk (ldm=%s)\n' \
-		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
 fi
 
 if gamebian_use_steam_without_gamescope 2>/dev/null; then
@@ -106,8 +99,8 @@ if gamebian_use_steam_without_gamescope 2>/dev/null; then
 		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
 	export GAMEBIAN_SKIP_GAMESCOPE=1
 else
-	printf '%s gamescope-session: starting kiosk (ldm=%s force=%s)\n' \
-		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" "${_force_steam}" >>"$_log" 2>/dev/null || true
+	printf '%s gamescope-session: starting kiosk (ldm=%s)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
 fi
 
 /usr/local/bin/gamebian-steam-bigpicture "$@"

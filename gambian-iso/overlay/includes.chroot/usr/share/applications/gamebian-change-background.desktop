@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Change Background
+Comment=Choose an image for the desktop wallpaper
+Exec=gamebian-change-background
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=Settings;DesktopSettings;
+Keywords wallpaper;background;image;feh;

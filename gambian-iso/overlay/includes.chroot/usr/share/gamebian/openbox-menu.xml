@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="Gamebian">
+    <item label="Change Background">
+      <icon>preferences-desktop-wallpaper</icon>
+      <action name="Execute">
+        <command>gamebian-change-background</command>
+      </action>
+    </item>
+    <separator />
+    <item label="Log Out">
+      <icon>system-log-out</icon>
+      <action name="Execute">
+        <command>gamebian-session-action logout</command>
+      </action>
+    </item>
+    <item label="Restart Desktop">
+      <icon>view-refresh</icon>
+      <action name="Execute">
+        <command>gamebian-session-action restart</command>
+      </action>
+    </item>
+    <item label="Reboot">
+      <icon>system-reboot</icon>
+      <action name="Execute">
+        <command>gamebian-session-action reboot</command>
+      </action>
+    </item>
+    <item label="Shut Down">
+      <icon>system-shutdown</icon>
+      <action name="Execute">
+        <command>gamebian-session-action shutdown</command>
+      </action>
+    </item>
+  </menu>
+</openbox_menu>

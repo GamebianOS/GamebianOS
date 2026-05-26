@@ -1,42 +1,17 @@
 #!/bin/sh
-# Installed Openbox (Desktop session): welcome + Steam logout + gamebian-web tips.
-# Only while Steam is not installed; after steam-installer is on disk this script exits immediately.
+# Installed Openbox desktop notifications — shown every time the desktop session starts.
 
 export DISPLAY="${DISPLAY:-:0}"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 _uid="$(id -u)"
-
-if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-ready.sh
-	gamebian_export_session_env
-else
-	export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
-	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
-	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
-fi
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
 
 LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/openbox-notify.log"
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 
 log() {
 	printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "$*" >>"$LOG" 2>/dev/null || true
-}
-
-gamebian_ensure_notifyd() {
-	_i=0
-	while [ "${_i}" -lt 60 ]; do
-		if ! pgrep -u "$(id -un)" -x xfce4-notifyd >/dev/null 2>&1; then
-			command -v xfce4-notifyd >/dev/null 2>&1 \
-				&& xfce4-notifyd >>"$LOG" 2>&1 &
-		fi
-		if [ -S "${XDG_RUNTIME_DIR}/bus" ] && pgrep -u "$(id -un)" -x xfce4-notifyd >/dev/null 2>&1; then
-			return 0
-		fi
-		sleep 1
-		_i=$((_i + 1))
-	done
-	log "notify daemon not ready (${_i}s)"
-	return 1
 }
 
 gamebian_notify() {
@@ -51,7 +26,25 @@ gamebian_notify() {
 		log "sent: ${_title}"
 		return 0
 	fi
-	log "notify-send failed: ${_title}"
+	log "notify-send failed (${DBUS_SESSION_BUS_ADDRESS}): ${_title}"
+	return 1
+}
+
+gamebian_wait_for_notifyd() {
+	_i=0
+	while [ "${_i}" -lt 120 ]; do
+		if ! pgrep -x xfce4-notifyd >/dev/null 2>&1; then
+			if command -v xfce4-notifyd >/dev/null 2>&1; then
+				xfce4-notifyd >/dev/null 2>&1 &
+			fi
+		fi
+		if [ -S "${XDG_RUNTIME_DIR}/bus" ] && pgrep -x xfce4-notifyd >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 1
+		_i=$((_i + 1))
+	done
+	log "notify daemon not ready (${_i}s) dbus=${DBUS_SESSION_BUS_ADDRESS}"
 	return 1
 }
 
@@ -66,35 +59,53 @@ gamebian_primary_ip() {
 	printf '%s' "${_ip}"
 }
 
-gamebian_show_desktop_welcome_notices() {
-	gamebian_ensure_notifyd || true
+# All three notices, every Openbox session (first boot and return visits).
+gamebian_show_openbox_session_notices() {
+	gamebian_wait_for_notifyd || true
 
-	gamebian_notify "Welcome to the Gamebian desktop" \
-		"You are in the Desktop (Openbox) session. Install and sign in to Steam here if needed." \
-		normal
-
-	gamebian_notify "Steam session" \
-		'When Steam is ready, logout and choose "Steam" at the login screen (or reboot) for the gamescope kiosk.' \
+	gamebian_notify "Welcome to Gamebian! [Desktop session]" \
+		'Desktop mode — use the Steam setup terminal to install Steam and sign in if you have not already.' \
 		normal
 
 	_ip="$(gamebian_primary_ip)"
-	if [ -n "${_ip}" ] && [ "${_ip}" != "127.0.0.1" ]; then
-		_web="Open http://127.0.0.1:8844 or http://${_ip}:8844 in a browser to install games, storefronts, and Flatpak images."
+	if [ -n "${_ip}" ]; then
+		_web=$(printf 'Visit http://127.0.0.1:8844 or http://%s:8844 in a browser to upload games, storefronts, and Flatpak images.' "${_ip}")
 	else
-		_web='Open http://127.0.0.1:8844 in a browser to install games, storefronts, and Flatpak images.'
+		_web='Visit http://127.0.0.1:8844 in a browser to upload games, storefronts, and Flatpak images.'
 	fi
 	gamebian_notify "Gamebian web" "${_web}" normal
+
+	if gamebian_steam_logged_in 2>/dev/null; then
+		_reboot='You are signed in to Steam. Please logout or reboot to load your Steam/Gamescope session.'
+	else
+		_reboot='After Steam is installed and you are signed in, logout or reboot to load your Steam/Gamescope session.'
+	fi
+	gamebian_notify "Steam session" "${_reboot}" critical
+
+	log "openbox session notices done"
 }
 
-# --- main ---
-grep -qw boot=live /proc/cmdline 2>/dev/null && exit 0
-
-if command -v gamebian_steam_binary_present >/dev/null 2>&1 \
-	&& gamebian_steam_binary_present; then
-	log "skip: Steam installed"
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
 	exit 0
 fi
 
-log "start DISPLAY=${DISPLAY}"
-gamebian_show_desktop_welcome_notices
-log "done"
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+
+_show=0
+case "${1:-} ${2:-}" in
+	*--desktop-session*|*--all*|*--welcome*|*--reboot-hint*|*--steam-ready*|*--force*)
+		_show=1
+		;;
+esac
+
+log "start show=${_show} DISPLAY=${DISPLAY} args=${*:-}"
+
+if [ "${_show}" -eq 1 ]; then
+	gamebian_show_openbox_session_notices
+fi
+
+rm -f "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
+exit 0

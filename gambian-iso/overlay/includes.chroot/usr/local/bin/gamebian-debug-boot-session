@@ -98,12 +98,12 @@ fi
 if ! command -v gamescope >/dev/null 2>&1; then
 	echo "  → ROOT CAUSE: gamescope missing — Steam session exits immediately (LightDM greeter loop)."
 	echo "     Fix: sudo gamebian-install-gamescope  (build from source on trixie — see docs/DEBIAN-STEAM-GAMESCOPE.md)"
-elif gamebian_steam_binary_present 2>/dev/null; then
-	echo "  → Autologin / Steam session should run gamescope (Openbox only if prefer-openbox-desktop or no steam binary)."
 elif [ "$(gamebian_steam_kiosk_ready 2>/dev/null && echo y)" = "y" ]; then
-	echo "  → Markers ready but steam binary missing — install Steam."
+	echo "  → Autologin should run gamescope (Openbox if prefer-openbox-desktop)."
+elif gamebian_steam_binary_present 2>/dev/null; then
+	echo "  → steam-installer present but setup not finished — autologin → Openbox + steam-firstboot-terminal."
 else
-	echo "  → No Steam binary — autologin falls back to Openbox."
+	echo "  → No Steam binary — autologin → Openbox + Install Steam terminal."
 fi
 echo ""
 

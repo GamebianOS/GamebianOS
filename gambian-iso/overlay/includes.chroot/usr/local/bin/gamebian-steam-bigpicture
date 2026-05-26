@@ -74,6 +74,10 @@ gamebian_detect_gamescope_wh() {
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
+if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-login-check.sh
+fi
 if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
@@ -92,6 +96,13 @@ if [ -z "$STEAM_BIN" ]; then
 		exec /usr/bin/openbox-session
 	fi
 	exit 1
+fi
+
+# Kiosk autologin requires a Steam account sign-in (loginusers.vdf).
+if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
+	&& ! gamebian_steam_kiosk_ready 2>/dev/null; then
+	log "Steam not signed in; switching to Openbox setup"
+	exec /usr/bin/openbox-session
 fi
 
 _use_gamescope=1
