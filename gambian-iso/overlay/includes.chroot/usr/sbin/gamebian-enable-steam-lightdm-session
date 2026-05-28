@@ -4,6 +4,21 @@ set -eu
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
 
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-lightdm-user.sh
+	_home="$(gamebian_lightdm_user_home)" || _home=""
+	if [ -n "${_home}" ] && ! gamebian_have_loginusers_vdf_for_home "${_home}"; then
+		echo "gamebian-enable-steam-lightdm-session: no Steam sign-in in ${_home}" >&2
+		echo "Sign in to Steam on the desktop first (controller menu → Steam)." >&2
+		exit 1
+	fi
+fi
+
 rm -f /etc/lightdm/lightdm.conf.d/90-gamebian-openbox-first-session.conf
 rm -f /etc/lightdm/lightdm.conf.d/99-gamebian-steam-session.conf
 rm -f /etc/lightdm/lightdm.conf.d/88-gamebian-openbox-session.conf

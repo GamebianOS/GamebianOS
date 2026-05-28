@@ -37,4 +37,4 @@ style "purple-notebook" = "purple-default" {
 
 class "GtkNotebook" style "purple-notebook"
 
-gtk-icon-theme-name = "Papirus"
+gtk-icon-theme-name = "Papirus-Dark"

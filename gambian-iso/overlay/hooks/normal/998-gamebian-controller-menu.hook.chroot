@@ -2,6 +2,7 @@
 set -e
 chmod 0755 /usr/local/bin/gamebian-controller-menu 2>/dev/null || true
 chmod 0755 /usr/share/gamebian/gamebian-lxpanel-tray.sh 2>/dev/null || true
+chmod 0755 /usr/share/gamebian/gamebian-lxpanel-apply-panel.sh 2>/dev/null || true
 chmod 0755 /usr/local/sbin/gamebian-ensure-apt-sources 2>/dev/null || true
 chmod 0755 /usr/sbin/gamebian-enter-steam-kiosk-session 2>/dev/null || true
 chmod 0644 /usr/share/gamebian/gamebian-lightdm-user.sh 2>/dev/null || true

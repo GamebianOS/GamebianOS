@@ -5,4 +5,4 @@ Comment=Openbox desktop
 Exec=/usr/bin/openbox-session
 TryExec=/usr/bin/openbox-session
 Type=XSession
-DesktopNames=gamebian-desktop
+DesktopNames=LXDE

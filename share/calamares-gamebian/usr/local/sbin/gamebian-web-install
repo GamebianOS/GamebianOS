@@ -129,6 +129,28 @@ if [ -n "$RETRO_APT" ]; then
     log "RetroArch packages: $_retro_ok installed, $_retro_miss skipped"
 fi
 
+if [ -f /usr/lib/x86_64-linux-gnu/libretro/mupen64plus_next_libretro.so ]; then
+    log "N64 libretro core already present"
+elif [ -x /usr/local/sbin/gamebian-install-libretro-mupen64plus-next ]; then
+    log "installing N64 libretro core (mupen64plus_next; not in Debian apt)"
+    /usr/local/sbin/gamebian-install-libretro-mupen64plus-next \
+        >>/var/log/gamebian-install-mupen64plus-next.log 2>&1 \
+        || log "warning: N64 core install failed — see /var/log/gamebian-install-mupen64plus-next.log"
+else
+    log "warning: gamebian-install-libretro-mupen64plus-next missing — N64 will not work until ISO hook or manual install"
+fi
+
+if [ -f /usr/lib/x86_64-linux-gnu/libretro/dolphin_libretro.so ]; then
+    log "Dolphin libretro core already present"
+elif [ -x /usr/local/sbin/gamebian-install-libretro-dolphin ]; then
+    log "installing Dolphin libretro core (GameCube/Wii; not in Debian apt)"
+    /usr/local/sbin/gamebian-install-libretro-dolphin \
+        >>/var/log/gamebian-install-libretro-dolphin.log 2>&1 \
+        || log "warning: Dolphin core install failed — see /var/log/gamebian-install-libretro-dolphin.log"
+else
+    log "warning: gamebian-install-libretro-dolphin missing — GC/Wii use dolphin-emu until core installed"
+fi
+
 log "installing gamebian-web APT dependencies (required)"
 # shellcheck disable=SC2086
 apt-get install -y --no-install-recommends $APT_CORE \

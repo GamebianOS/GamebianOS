@@ -46,19 +46,21 @@ if [ -r /usr/share/gamebian/openbox-menu.xml ] \
 	openbox --reconfigure 2>/dev/null &
 fi
 
-# lxpanel layout: same panel config on live ISO vs disk (templates under /usr/share/gamebian/lxpanel/)
-mkdir -p "${HOME}/.config/lxpanel/default/panels"
-if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+# lxpanel: transparent tint from desktop theme (see gamebian-lxpanel-apply-panel.sh).
+if [ -x /usr/share/gamebian/gamebian-lxpanel-apply-panel.sh ]; then
+	/usr/share/gamebian/gamebian-lxpanel-apply-panel.sh
+elif grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	mkdir -p "${HOME}/.config/lxpanel/default/panels"
 	cp -f /usr/share/gamebian/lxpanel/panel-live "${HOME}/.config/lxpanel/default/panels/panel"
 else
+	mkdir -p "${HOME}/.config/lxpanel/default/panels"
 	cp -f /usr/share/gamebian/lxpanel/panel-installed "${HOME}/.config/lxpanel/default/panels/panel"
-	# Stale lxpanel/systray only when panel was already running (re-login), not every cold boot.
-	if pgrep -x lxpanel >/dev/null 2>&1; then
-		pkill -x nm-tray 2>/dev/null || true
-		pkill -f '[b]lueman-applet' 2>/dev/null || true
-		pkill -x lxpanel 2>/dev/null || true
-		sleep 0.15
-	fi
+fi
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null && pgrep -x lxpanel >/dev/null 2>&1; then
+	pkill -x nm-tray 2>/dev/null || true
+	pkill -f '[b]lueman-applet' 2>/dev/null || true
+	pkill -x lxpanel 2>/dev/null || true
+	sleep 0.15
 fi
 lxpanel &
 
@@ -142,6 +144,11 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 			_steam_term_title="Steam setup"
 			if ! command -v steam >/dev/null 2>&1; then
 				_steam_term_title="Install Steam"
+			fi
+			if command -v notify-send >/dev/null 2>&1; then
+				notify-send -a Gamebian -t 45000 "${_steam_term_title}" \
+					"This may take several minutes. Watch the setup terminal for apt progress. Steam can run in the background while it downloads updates." \
+					2>/dev/null || true
 			fi
 			( sleep 2 && xfce4-terminal \
 				--title="${_steam_term_title}" \

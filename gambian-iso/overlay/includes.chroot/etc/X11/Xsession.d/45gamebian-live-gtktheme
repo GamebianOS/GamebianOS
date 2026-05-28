@@ -7,12 +7,8 @@ if [ -z "${GTK_THEME:-}" ]; then
     fi
     export GTK_THEME
 fi
-# Icon theme: Qt nm-tray uses gtk3 platform theme. Live = Papirus; installed dark GTK = Papirus-Dark.
+# Icon theme: Qt6 nm-tray needs Papirus-Dark on dark/blue panels (Papirus → white/missing squares).
 if [ -z "${GTK_ICON_THEME:-}" ]; then
-    if grep -qw boot=live /proc/cmdline 2>/dev/null; then
-        GTK_ICON_THEME=Papirus
-    else
-        GTK_ICON_THEME=Papirus-Dark
-    fi
+    GTK_ICON_THEME=Papirus-Dark
     export GTK_ICON_THEME
 fi

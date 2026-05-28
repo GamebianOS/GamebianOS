@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# Primary branding colors (TODO/Gamescope- Kernel Optimizations)
+# Primary branding colors — keep in sync with gamebian_controller_menu.py THEME_ACCENTS.
 PALETTE: dict[str, str] = {
     "green": "#0B441D",
     "yellow": "#F89917",
@@ -282,8 +282,14 @@ style "{sid}-notebook" = "{sid}-default" {{
 
 class "GtkNotebook" style "{sid}-notebook"
 
-gtk-icon-theme-name = "Papirus"
+gtk-icon-theme-name = "{_gtk2_icon_theme(name)}"
 """
+
+
+def _gtk2_icon_theme(name: str) -> str:
+    if name == "yellow":
+        return "Papirus"
+    return "Papirus-Dark"
 
 
 def openbox_themerc(name: str, p: dict[str, str]) -> str:

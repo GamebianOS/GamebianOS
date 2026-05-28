@@ -1,3 +1,7 @@
-# Qt systray apps (nm-tray) follow GTK icon settings when using the gtk3 platform theme.
-export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-gtk3}"
+# Qt6 nm-tray: qt6ct sets icon theme explicitly (gtk3 alone → white squares in lxpanel tray).
+if command -v qt6ct >/dev/null 2>&1; then
+    export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-qt6ct}"
+else
+    export QT_QPA_PLATFORMTHEME="${QT_QPA_PLATFORMTHEME:-gtk3}"
+fi
 export QT_AUTO_SCREEN_SCALE_FACTOR="${QT_AUTO_SCREEN_SCALE_FACTOR:-0}"

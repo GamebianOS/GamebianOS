@@ -38,4 +38,4 @@ style "gamebian-notebook" = "gamebian-default" {
 
 class "GtkNotebook" style "gamebian-notebook"
 
-gtk-icon-theme-name = "Papirus"
+gtk-icon-theme-name = "Papirus-Dark"

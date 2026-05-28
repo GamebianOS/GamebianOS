@@ -1,5 +1,7 @@
 #!/bin/sh
-# Steam "Switch to Desktop": in-session handoff to Openbox only (does not change next boot).
+# Steam "Switch to Desktop": set handoff flag and stop gamescope kiosk (return immediately).
+# Steam blocks on steamos-session-select until this script exits — never steam -shutdown sync.
+# Openbox is started by gamebian-steam-bigpicture via gamebian_handoff_to_openbox_desktop.
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
@@ -17,29 +19,17 @@ if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
 fi
 
-log "switch-to-desktop (session handoff only; boot session unchanged)"
+log "switch-to-desktop: request handoff (boot session unchanged)"
 
 gamebian_request_switch_to_openbox
+gamebian_kill_steam_kiosk_tree
 
-if command -v steam >/dev/null 2>&1; then
-	steam -shutdown 2>/dev/null || true
-fi
+(
+	sleep 0.2
+	gamebian_kill_steam_kiosk_tree
+) &
 
-_i=0
-while [ "${_i}" -lt 20 ]; do
-	if ! pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
-		&& ! pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
-		break
-	fi
-	sleep 0.25
-	_i=$((_i + 1))
-done
-
-pkill -u "$(id -un)" -TERM -x gamescope 2>/dev/null || true
-pkill -u "$(id -un)" -TERM -x steam 2>/dev/null || true
-sleep 0.5
-pkill -u "$(id -un)" -KILL -x gamescope 2>/dev/null || true
-pkill -u "$(id -un)" -KILL -x steam 2>/dev/null || true
-
-log "done flag=$(test -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" && echo set || echo missing)"
+_gs=$(pgrep -u "$(id -un)" -x gamescope 2>/dev/null | head -1 || true)
+_st=$(pgrep -u "$(id -un)" -x steam 2>/dev/null | head -1 || true)
+log "done flag=set gamescope=${_gs:-none} steam=${_st:-none} (bigpicture will exec openbox)"
 exit 0

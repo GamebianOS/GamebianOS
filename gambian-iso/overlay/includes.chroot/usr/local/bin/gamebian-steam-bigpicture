@@ -130,7 +130,15 @@ fi
 
 # Nested under Openbox: skip if Steam is already running (menu / Super+Shift+S relaunch).
 if [ -z "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-	if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
+	if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 \
+		|| pgrep -u "$(id -un)" -x steam.sh >/dev/null 2>&1; then
+		case "${GAMEBIAN_STEAM_SIGNIN:-}" in
+			1|yes|true|YES|TRUE)
+				log "sign-in: Steam already running — opening main window"
+				"$STEAM_BIN" >>"${LOG}" 2>&1 &
+				exit 0
+				;;
+		esac
 		exit 0
 	fi
 elif pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; then
@@ -224,6 +232,19 @@ if [ -n "$_gamebian_sync" ] && ! pgrep -u "$(id -un)" -x steam >/dev/null 2>&1; 
 	fi
 fi
 
+gamebian_stop_gamescope_pid() {
+	_pid="$1"
+	[ -n "$_pid" ] || return 0
+	kill -TERM "$_pid" 2>/dev/null || true
+	_w=0
+	while kill -0 "$_pid" 2>/dev/null && [ "${_w}" -lt 40 ]; do
+		sleep 0.25
+		_w=$((_w + 1))
+	done
+	kill -KILL "$_pid" 2>/dev/null || true
+	wait "$_pid" 2>/dev/null || true
+}
+
 _run_gamescope() {
 	_steam_args="$1"
 	if [ -n "${GAMEBIAN_VK_ICD_FILENAMES:-}" ]; then
@@ -234,7 +255,23 @@ _run_gamescope() {
 	esac
 	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
 	# shellcheck disable=SC2086
-	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@"
+	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
+	_gs_pid=$!
+	_rc=0
+	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
+	while kill -0 "$_gs_pid" 2>/dev/null; do
+		if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -f "${_handoff}" ]; then
+			log "Switch to Desktop: stopping gamescope kiosk (pid ${_gs_pid})"
+			gamebian_stop_gamescope_pid "$_gs_pid"
+			if command -v gamebian_kill_steam_kiosk_tree >/dev/null 2>&1; then
+				gamebian_kill_steam_kiosk_tree
+			fi
+			return 0
+		fi
+		sleep 0.25
+	done
+	wait "$_gs_pid" 2>/dev/null || _rc=$?
+	return $_rc
 }
 
 _steam_direct() {
@@ -277,15 +314,15 @@ _launch() {
 if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 	_launch "$@"
 	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
-	if [ -f "${_handoff}" ]; then
-		rm -f "${_handoff}" 2>/dev/null || true
-		gamebian_kiosk_marker_clear 2>/dev/null || true
+	if [ -f "${_handoff}" ] || pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
 		if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
-			log "Switch to Desktop: returning to Openbox (in-place kiosk)"
+			log "Switch to Desktop: openbox already running"
+			rm -f "${_handoff}" 2>/dev/null || true
+			gamebian_kiosk_marker_clear 2>/dev/null || true
 			exit 0
 		fi
-		log "Switch to Desktop: starting Openbox in this LightDM session"
-		exec /usr/bin/openbox-session
+		log "Switch to Desktop: handoff to openbox-session"
+		gamebian_handoff_to_openbox_desktop
 	fi
 	exit $?
 fi

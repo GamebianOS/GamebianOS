@@ -238,4 +238,5 @@ done
 echo "Configured: overlay merged into $BUILD_ROOT/config"
 echo "Artifacts (binary/, iso) go to: $BUILD_ROOT"
 echo "gamescope: hook 997 builds ValveSoftware/gamescope @ 3.16.22 during lb build (needs network)."
+echo "N64 core: hook 997 runs gamebian-install-libretro-mupen64plus-next after apt retroarch packages (needs network)."
 echo "From here: cd $SCRIPT_ROOT && ./build.sh"

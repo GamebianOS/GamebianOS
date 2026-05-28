@@ -1,5 +1,5 @@
 #!/bin/sh
-# LightDM autologin: live → Openbox. Installed → gamescope when Steam installed + signed in, else Openbox.
+# LightDM autologin dispatcher: Openbox until Steam is signed in, then gamescope kiosk.
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
@@ -9,22 +9,28 @@ if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	. /usr/share/gamebian/gamebian-session-log.sh
 	gamebian_session_log "gamebian-autologin" "$@"
 fi
-
-if grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	exec /usr/bin/openbox-session
-fi
-
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	exec /usr/bin/openbox-session
 fi
 
 if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
 	exec /usr/bin/openbox-session
 fi
 
+# One-shot after controller menu "Enter Steam" if session was ended the old way.
+if [ -f "${HOME}/.config/gamebian/handoff-to-gamescope" ]; then
+	rm -f "${HOME}/.config/gamebian/handoff-to-gamescope" \
+		"${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
+	exec /usr/local/bin/gamebian-steam-gamescope-session "$@"
+fi
+
 if gamebian_steam_kiosk_ready 2>/dev/null; then
-	exec /usr/local/bin/gamebian-steam-gamescope-session
+	exec /usr/local/bin/gamebian-steam-gamescope-session "$@"
 fi
 
 exec /usr/bin/openbox-session

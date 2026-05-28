@@ -9,6 +9,7 @@ bluez
 blueman
 qt5-gtk-platformtheme
 qt6-gtk-platformtheme
+qt6ct
 hicolor-icon-theme
 libqt5svg5
 # Standalone NM connection GUI (pairs with nm-tray — do not rely on applet metapackages)
@@ -24,6 +25,7 @@ curl
 ca-certificates
 openssh-client
 openssh-server
+rsync
 vim
 x11-utils
 zenity
@@ -47,8 +49,10 @@ desktop-base
 
 openbox
 python3
+python3-gi
 python3-evdev
 python3-tk
+gir1.2-nm-1.0
 lxappearance
 lxappearance-obconf
 # X11 resolution / monitor mode picker (RandR); pairs with Openbox on Gamebian.

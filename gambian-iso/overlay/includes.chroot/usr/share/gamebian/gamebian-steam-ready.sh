@@ -1,13 +1,19 @@
 # shellcheck shell=sh
 # Shared Steam install / setup checks (Openbox autostart, gamescope session, notices).
 
-gamebian_have_loginusers_vdf() {
-	for _gf in "${XDG_DATA_HOME:-${HOME}/.local/share}/Steam/config/loginusers.vdf" \
-		"${HOME}/.steam/debian-installation/config/loginusers.vdf" \
-		"${HOME}/.steam/root/config/loginusers.vdf"; do
+gamebian_have_loginusers_vdf_for_home() {
+	_home="$1"
+	[ -n "${_home}" ] || return 1
+	for _gf in "${_home}/.local/share/Steam/config/loginusers.vdf" \
+		"${_home}/.steam/debian-installation/config/loginusers.vdf" \
+		"${_home}/.steam/root/config/loginusers.vdf"; do
 		[ -f "${_gf}" ] && return 0
 	done
 	return 1
+}
+
+gamebian_have_loginusers_vdf() {
+	gamebian_have_loginusers_vdf_for_home "${HOME}"
 }
 
 gamebian_steam_binary_present() {

@@ -8,7 +8,9 @@ Global {
   widthtype=percent
   width=100
   height=30
-  transparent=0
+  transparent=1
+  tintcolor=#1C1C24
+  alpha=120
   setdocktype=1
   setpartialstrut=1
   usefontcolor=1

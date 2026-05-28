@@ -1,0 +1,73 @@
+#!/bin/sh
+# Install Dolphin libretro core for RetroArch (not in Debian trixie apt).
+# GameCube/Wii use /usr/bin/ngc and /usr/bin/wii → launcher dolphin.
+# ISO hook 997, Calamares gamebian-web-install, or:
+#   sudo /usr/local/sbin/gamebian-install-libretro-dolphin
+set -e
+
+export DEBIAN_FRONTEND=noninteractive
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+INSTALL_DIR="${INSTALL_DIR:-/usr/lib/x86_64-linux-gnu/libretro}"
+SO_NAME="dolphin_libretro.so"
+ZIP_URL="${GAMEBIAN_DOLPHIN_ZIP_URL:-https://buildbot.libretro.com/nightly/linux/x86_64/latest/${SO_NAME}.zip}"
+
+log() { printf '[install-dolphin] %s\n' "$*"; }
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec sudo "$0" "$@"
+fi
+
+if [ -f "${INSTALL_DIR}/${SO_NAME}" ]; then
+	log "already installed: ${INSTALL_DIR}/${SO_NAME}"
+	exit 0
+fi
+
+if ! command -v retroarch >/dev/null 2>&1; then
+	log "retroarch not installed — install debian-retroarch.list packages first" >&2
+	exit 1
+fi
+
+apt-get install -y --no-install-recommends curl ca-certificates unzip \
+	>/dev/null 2>&1 \
+	|| apt-get install -y --no-install-recommends curl ca-certificates unzip
+
+_tmp="$(mktemp -d)" || exit 1
+_zip="${_tmp}/${SO_NAME}.zip"
+trap 'rm -rf "${_tmp}"' EXIT INT TERM
+
+log "downloading ${ZIP_URL}"
+curl -fsSL -o "${_zip}" "${ZIP_URL}" || {
+	log "download failed" >&2
+	exit 1
+}
+unzip -q -o "${_zip}" -d "${_tmp}" || {
+	log "unzip failed" >&2
+	exit 1
+}
+if [ ! -f "${_tmp}/${SO_NAME}" ]; then
+	log "zip did not contain ${SO_NAME}" >&2
+	exit 1
+fi
+
+mkdir -p "${INSTALL_DIR}"
+install -m 0644 "${_tmp}/${SO_NAME}" "${INSTALL_DIR}/${SO_NAME}"
+
+_size="$(wc -c <"${INSTALL_DIR}/${SO_NAME}" | tr -d ' ')"
+if [ "${_size:-0}" -lt 5000000 ]; then
+	log "installed file too small (${_size} bytes)" >&2
+	rm -f "${INSTALL_DIR}/${SO_NAME}"
+	exit 1
+fi
+if command -v ldd >/dev/null 2>&1; then
+	_missing="$(ldd "${INSTALL_DIR}/${SO_NAME}" 2>&1 | grep 'not found' || true)"
+	if [ -n "$_missing" ]; then
+		log "unresolved libraries:" >&2
+		printf '%s\n' "$_missing" >&2
+		rm -f "${INSTALL_DIR}/${SO_NAME}"
+		exit 1
+	fi
+fi
+
+log "verify OK (${_size} bytes) → ${INSTALL_DIR}/${SO_NAME}"
+exit 0

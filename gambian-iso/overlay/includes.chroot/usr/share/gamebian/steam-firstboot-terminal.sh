@@ -5,6 +5,15 @@ set +e
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Steam setup — this can take several minutes"
+echo ""
+echo "  • Installing steam-installer (apt) may take a few minutes."
+echo "  • After Steam starts, it often downloads updates in the background."
+echo "  • Keep this window open and watch the output below."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
@@ -47,7 +56,8 @@ _try_install_steam() {
 	if _find_steam_bin; then
 		return 0
 	fi
-	echo "Steam is not installed. Installing (i386 + non-free)…"
+	echo "Steam is not installed. Installing steam-installer (i386 + non-free)…"
+	echo "This may take several minutes — apt output will appear below."
 	echo ""
 
 	if [ "$(id -u)" -eq 0 ]; then
@@ -111,6 +121,7 @@ if [ -x /usr/share/gamebian/gamebian-steam-reboot-notify-watcher.sh ]; then
 fi
 
 echo "Starting Steam… output below is from Valve’s launcher script."
+echo "Steam may sit in the background while it downloads updates — that is normal."
 echo "Install updates if prompted, then sign in to your Steam account and quit Steam."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 "${steam_bin}"

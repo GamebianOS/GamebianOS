@@ -106,10 +106,18 @@ fi
 /usr/local/bin/gamebian-steam-bigpicture "$@"
 _rc=$?
 
+# bigpicture exec's openbox on handoff; if openbox is running, wait instead of relaunching gamescope.
+if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+	printf '%s gamescope-session: openbox active — waiting (no gamescope restart)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+	while pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; do
+		sleep 2
+	done
+	exit 0
+fi
+
 if [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
-	rm -f "${GAMEBIAN_SWITCH_OPENBOX}" 2>/dev/null || true
-	gamebian_kiosk_marker_clear 2>/dev/null || true
-	exec /usr/bin/openbox-session
+	gamebian_handoff_to_openbox_desktop
 fi
 
 gamebian_kiosk_marker_clear 2>/dev/null || true
