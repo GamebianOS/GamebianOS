@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Debian live-build: lightweight Openbox-based live ISO.
-# Run from this directory (openbox-live). Overlay is merged into GAMEBIANOS_BUILD_ROOT.
+# Debian live-build: Gamebian Openbox live ISO profile.
+# Run from Build/gambian-iso/. Overlay is merged into GAMEBIANOS_BUILD_ROOT.
 
 set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -9,11 +9,6 @@ OVERLAY="$SCRIPT_ROOT/overlay"
 DESIGN_SHARE="$OVERLAY/includes.chroot/etc/skel/.local/share/gamebian"
 
 mkdir -p "$BUILD_ROOT"
-
-# Separate openbox profile live-build tree; remove so builds do not overlap or leave stale state.
-if [[ -e /home/khinds/gamebianos-build-openbox ]]; then
-  sudo rm -rf /home/khinds/gamebianos-build-openbox
-fi
 
 if [[ -d "$SCRIPT_ROOT/design" ]]; then
   mkdir -p "$DESIGN_SHARE"
@@ -68,7 +63,7 @@ if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
 fi
 
-# APT contrib + non-free helper (libretro-snes9x and other cores).
+# APT contrib + non-free helper — canonical copy in Build/share/gamebian/ (overlays must not duplicate).
 ENSURE_APT_SRC="$SCRIPT_ROOT/../share/gamebian/ensure-apt-contrib-nonfree.sh"
 ENSURE_APT_DST="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/ensure-apt-contrib-nonfree.sh"
 if [[ -f "$ENSURE_APT_SRC" ]]; then
@@ -210,8 +205,6 @@ if [[ -f "$GAMEBIAN_SHARE/merge-calamares-gamebian.sh" ]]; then
   chmod +x "$GAMEBIAN_SHARE/merge-calamares-gamebian.sh"
   if [[ -d "$SCRIPT_ROOT/design" ]]; then
     CAL_DESIGN="$(cd "$SCRIPT_ROOT/design" && pwd)"
-  elif [[ -d "$SCRIPT_ROOT/../openbox-live/design" ]]; then
-    CAL_DESIGN="$(cd "$SCRIPT_ROOT/../openbox-live/design" && pwd)"
   else
     CAL_DESIGN=""
   fi

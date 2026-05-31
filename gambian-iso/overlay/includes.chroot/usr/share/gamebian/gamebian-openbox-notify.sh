@@ -107,5 +107,4 @@ if [ "${_show}" -eq 1 ]; then
 	gamebian_show_openbox_session_notices
 fi
 
-rm -f "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
 exit 0

@@ -84,37 +84,6 @@ _end_session_for_gamescope() {
 	exit 1
 }
 
-_launch_gamescope_kiosk_on_display() {
-	rm -f "${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
-	rm -f "${HOME}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
-	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
-
-	if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
-		set -a
-		# shellcheck disable=SC1091
-		. "${HOME}/.config/gamebian/steam-gamescope.env"
-		set +a
-	fi
-	if [ -r /etc/default/gamebian-steam-gamescope ]; then
-		set -a
-		# shellcheck disable=SC1091
-		. /etc/default/gamebian-steam-gamescope
-		set +a
-	fi
-
-	export GAMEBIAN_GAMESCOPE_SESSION=1
-	export DESKTOP_SESSION=gamebian-steam-gamescope
-	export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
-	export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
-	gamebian_kiosk_marker_set 2>/dev/null || true
-
-	# Hide desktop shell; gamescope runs fullscreen on this DISPLAY (stay logged in to LightDM).
-	pkill -x lxpanel 2>/dev/null || true
-	log "starting gamescope + Steam on ${DISPLAY} (no LightDM logout)"
-	exec /usr/local/bin/gamebian-steam-gamescope-session
-}
-
 gamebian_find_steam_bin() {
 	for _c in /usr/games/steam /usr/bin/steam /usr/local/bin/steam; do
 		if [ -n "${_c}" ] && [ -x "${_c}" ]; then
@@ -172,35 +141,17 @@ _launch_steam_on_openbox() {
 		gamebian_fix_steam_share
 	fi
 
-	# Sign-in: plain Steam on the desktop (no gamescope). Do not use gamebian-steam-bigpicture
-	# here — it exits immediately when steam -silent is already running from the tray.
-	if ! gamebian_steam_logged_in 2>/dev/null; then
-		log "Steam sign-in: starting desktop UI (${_steam_bin})"
-		if command -v notify-send >/dev/null 2>&1; then
-			notify-send -a Gamebian -t 45000 "Steam setup" \
-				"Starting Steam. First launch may take a while — it often updates in the background while you wait." \
-				2>/dev/null || true
-		fi
-		if _steam_process_running; then
-			log "Steam already running (likely -silent) — opening main window"
-		fi
-		"${_steam_bin}" >>"$LOG" 2>&1 &
-		return 0
+	# Sign-in: plain Steam on the desktop (no gamescope). Caller runs only when not signed in.
+	log "Steam sign-in: starting desktop UI (${_steam_bin})"
+	if command -v notify-send >/dev/null 2>&1; then
+		notify-send -a Gamebian -t 45000 "Steam setup" \
+			"Starting Steam. First launch may take a while — it often updates in the background while you wait." \
+			2>/dev/null || true
 	fi
-
-	if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
-		set -a
-		# shellcheck disable=SC1091
-		. "${HOME}/.config/gamebian/steam-gamescope.env"
-		set +a
+	if _steam_process_running; then
+		log "Steam already running (likely -silent) — opening main window"
 	fi
-	if [ -r /etc/default/gamebian-steam-gamescope ]; then
-		set -a
-		# shellcheck disable=SC1091
-		. /etc/default/gamebian-steam-gamescope
-		set +a
-	fi
-	/usr/local/bin/gamebian-steam-bigpicture >>"$LOG" 2>&1 &
+	"${_steam_bin}" >>"$LOG" 2>&1 &
 	return 0
 }
 
@@ -211,7 +162,7 @@ if _in_exclusive_kiosk; then
 	exit 0
 fi
 
-# Openbox: sign in on the desktop first; only hand off to LightDM kiosk once Steam account exists.
+# Openbox: sign in on the desktop first; end Openbox so LightDM autologins gamescope kiosk.
 if _on_openbox_desktop; then
 	if ! gamebian_steam_logged_in 2>/dev/null; then
 		_launch_steam_on_openbox
@@ -221,23 +172,16 @@ if _on_openbox_desktop; then
 		log "could not enable Steam session for next boot (sudo /usr/sbin/gamebian-enable-steam-lightdm-session)"
 	fi
 	_stop_steam_gamescope
-	_launch_gamescope_kiosk_on_display
+	_end_session_for_gamescope
 fi
 
 _enable_lightdm_gamescope || true
 _stop_steam_gamescope
 
-if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
-	set -a
+if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
 	# shellcheck disable=SC1091
-	. "${HOME}/.config/gamebian/steam-gamescope.env"
-	set +a
-fi
-if [ -r /etc/default/gamebian-steam-gamescope ]; then
-	set -a
-	# shellcheck disable=SC1091
-	. /etc/default/gamebian-steam-gamescope
-	set +a
+	. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+	gamebian_source_steam_gamescope_env
 fi
 
 export GAMEBIAN_GAMESCOPE_SESSION=1

@@ -23,7 +23,7 @@ strings:
 sidebar: widget
 navigation: widget
 
-# Image files are produced by merge-calamares-gamebian.sh from openbox-live/design:
+# Image files are produced by merge-calamares-gamebian.sh from gambian-iso/design:
 #   console.png           -> welcome.png (+ slide1.png for show.qml): main large pane
 #   live-controller.png   -> gamebian-logo.png: icon above sidebar step list (+ window icon)
 images:

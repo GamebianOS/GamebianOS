@@ -74,10 +74,6 @@ gamebian_detect_gamescope_wh() {
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
-fi
 if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
@@ -85,6 +81,11 @@ fi
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+	gamebian_source_steam_gamescope_env
 fi
 
 GAMESCOPE_BIN="$(find_bin gamescope /usr/games/gamescope /usr/bin/gamescope /usr/local/bin/gamescope)" || GAMESCOPE_BIN=""
@@ -125,6 +126,8 @@ if [ -n "${GAMEBIAN_VK_ICD_FILENAMES:-}" ]; then
 	_icd_first="${GAMEBIAN_VK_ICD_FILENAMES%%:*}"
 	if [ ! -r "$_icd_first" ]; then
 		log "VK ICD file missing or unreadable: $_icd_first — ls /usr/share/vulkan/icd.d (often radeon_icd.json, not radeon_icd.x86_64.json)"
+	else
+		log "using VK ICD: ${GAMEBIAN_VK_ICD_FILENAMES}"
 	fi
 fi
 
@@ -283,18 +286,23 @@ _steam_direct() {
 
 _launch() {
 	_rc=1
+	_gamescope_tried=0
 	if [ "$_use_gamescope" -eq 1 ]; then
 		for _mode in $_steam_modes; do
+			_gamescope_tried=1
 			if _run_gamescope "$_mode"; then
 				return 0
 			fi
-			log "gamescope exited $? (common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
-			# User chose Switch to Desktop — do not relaunch Steam on bare X (causes X cursor + steam loop).
+			log "gamescope exited $? (mode=${_mode}; common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
 			if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
 				&& [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
 				return 0
 			fi
 		done
+		if [ "${_gamescope_tried}" -eq 1 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+			log "kiosk: gamescope unavailable — starting Steam on X once (no relaunch loop; GAMEBIAN_SKIP_GAMESCOPE=1 in steam-gamescope.env to skip gamescope)"
+			_use_gamescope=0
+		fi
 	fi
 	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 		log "kiosk: gamescope unavailable or exited — starting Steam on X"
@@ -316,9 +324,12 @@ if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
 	if [ -f "${_handoff}" ] || pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
 		if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
-			log "Switch to Desktop: openbox already running"
+			log "Switch to Desktop: openbox already running — refresh desktop notices"
 			rm -f "${_handoff}" 2>/dev/null || true
 			gamebian_kiosk_marker_clear 2>/dev/null || true
+			if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
+				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
+			fi
 			exit 0
 		fi
 		log "Switch to Desktop: handoff to openbox-session"

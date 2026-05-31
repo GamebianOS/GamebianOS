@@ -22,13 +22,6 @@ if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
 	exec /usr/bin/openbox-session
 fi
 
-# One-shot after controller menu "Enter Steam" if session was ended the old way.
-if [ -f "${HOME}/.config/gamebian/handoff-to-gamescope" ]; then
-	rm -f "${HOME}/.config/gamebian/handoff-to-gamescope" \
-		"${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
-	exec /usr/local/bin/gamebian-steam-gamescope-session "$@"
-fi
-
 if gamebian_steam_kiosk_ready 2>/dev/null; then
 	exec /usr/local/bin/gamebian-steam-gamescope-session "$@"
 fi

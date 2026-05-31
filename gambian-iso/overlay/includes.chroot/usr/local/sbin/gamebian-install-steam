@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install Debian steam-installer on amd64 (requires i386 + non-free).
+# Install Debian steam-installer on amd64 (requires i386 + non-free; unmixes sid pins when needed).
 set -eu
 
 export DEBIAN_FRONTEND=noninteractive

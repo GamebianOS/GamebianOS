@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from Build/openbox-live; live-build cwd is GAMEBIANOS_BUILD_ROOT.
+# Run from Build/gambian-iso; live-build cwd is GAMEBIANOS_BUILD_ROOT.
 
 set -euo pipefail
 SCRIPT_ROOT="$(cd "$(dirname "$0")" && pwd)"

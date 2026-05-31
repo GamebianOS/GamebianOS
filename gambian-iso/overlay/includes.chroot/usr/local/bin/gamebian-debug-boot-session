@@ -58,9 +58,8 @@ else
 fi
 echo ""
 
-_section "Steam .desktop (what LightDM should exec for gamebian-steam)"
-for _d in /usr/share/gamebian/xsessions/gamebian-steam.desktop \
-	/usr/share/xsessions/gamebian-steam.desktop; do
+_section "Steam .desktop (greeter session list)"
+for _d in /usr/share/gamebian/xsessions/gamebian-steam.desktop; do
 	if [ -f "${_d}" ]; then
 		echo "file=${_d}"
 		grep -E '^(Name|Exec|TryExec|DesktopNames)=' "${_d}" || true

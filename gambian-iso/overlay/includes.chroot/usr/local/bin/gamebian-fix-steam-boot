@@ -16,7 +16,20 @@ fi
 
 /usr/sbin/gamebian-enable-steam-lightdm-session
 
-_u=""
+if command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1; then
+	rm -f /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_fb_home="$(gamebian_lightdm_user_home)" || _fb_home=""
+		[ -n "${_fb_home}" ] && rm -f "${_fb_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+	fi
+else
+	echo ""
+	echo "gamescope is missing or broken on this system."
+	echo "  Calamares needs network during install. Check: /var/log/gamebian-install-gamescope.log"
+	echo "  Install now: sudo gamebian-install-gamescope"
+fi
 if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-lightdm-user.sh

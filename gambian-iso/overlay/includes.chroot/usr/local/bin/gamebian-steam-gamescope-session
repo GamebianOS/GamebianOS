@@ -13,10 +13,6 @@ if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
 	gamebian_session_log "gamebian-steam-gamescope" "ldm=${GAMEBIAN_LIGHTDM_SESSION} $*"
 fi
 
-if [ -r /usr/share/gamebian/gamebian-steam-login-check.sh ]; then
-	# shellcheck disable=SC1091
-	. /usr/share/gamebian/gamebian-steam-login-check.sh
-fi
 if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-ready.sh
@@ -62,17 +58,10 @@ if [ -n "${POLKIT_AGENT}" ]; then
 	"${POLKIT_AGENT}" >/dev/null 2>&1 &
 fi
 
-if [ -r /etc/default/gamebian-steam-gamescope ]; then
-	set -a
+if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
 	# shellcheck disable=SC1091
-	. /etc/default/gamebian-steam-gamescope
-	set +a
-fi
-if [ -r "${HOME}/.config/gamebian/steam-gamescope.env" ]; then
-	set -a
-	# shellcheck disable=SC1091
-	. "${HOME}/.config/gamebian/steam-gamescope.env"
-	set +a
+	. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+	gamebian_source_steam_gamescope_env
 fi
 
 _log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
@@ -89,7 +78,6 @@ if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
 			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" \
 			"${_have_steam}" "${_kiosk_ok}" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
 		export DISPLAY="${DISPLAY:-:0}"
-		touch "${HOME}/.config/gamebian/pending-openbox-notify" 2>/dev/null || true
 		exec /usr/bin/openbox-session
 	fi
 fi

@@ -59,7 +59,22 @@ _gamebian_steam_without_gamescope() {
 	echo "Steam LightDM session will still work. Reboot and log in as Steam."
 }
 
+_gamebian_clear_gamescope_fallback_markers() {
+	rm -f /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_home="$(gamebian_lightdm_user_home)" || _home=""
+		_u="$(gamebian_lightdm_autologin_user)" || _u=""
+		if [ -n "${_home}" ]; then
+			rm -f "${_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+			[ -n "${_u}" ] && chown "${_u}:${_u}" "${_home}/.config/gamebian" 2>/dev/null || true
+		fi
+	fi
+}
+
 if gamebian_gamescope_binary_works 2>/dev/null; then
+	_gamebian_clear_gamescope_fallback_markers
 	echo "gamescope OK: $(command -v gamescope 2>/dev/null || echo /usr/games/gamescope)"
 	exit 0
 fi
@@ -87,7 +102,7 @@ if apt-cache policy gamescope 2>/dev/null | grep -q 'trixie'; then
 	if apt-get install -y gamescope; then
 		_gamebian_link_gamescope_bins
 		if gamebian_gamescope_binary_works 2>/dev/null; then
-			rm -f /etc/gamebian/steam-without-gamescope
+			_gamebian_clear_gamescope_fallback_markers
 			echo "OK (apt): $(command -v gamescope)"
 			exit 0
 		fi
@@ -166,7 +181,7 @@ _gamebian_gamescope_build_deps || echo "warning: some build-deps may be missing"
 
 if _gamebian_gamescope_build_from_source; then
 	if gamebian_gamescope_binary_works 2>/dev/null; then
-		rm -f /etc/gamebian/steam-without-gamescope
+		_gamebian_clear_gamescope_fallback_markers
 		case "${GAMEBIAN_GAMESCOPE_KEEP_SRC:-0}" in
 			0|no|false|NO|FALSE) rm -rf "${GAMEBIAN_GAMESCOPE_SRC_DIR:-/var/tmp/gamebian-gamescope-src}" \
 				"${GAMEBIAN_GAMESCOPE_BUILD_DIR:-/var/tmp/gamebian-gamescope-build}" 2>/dev/null || true ;;

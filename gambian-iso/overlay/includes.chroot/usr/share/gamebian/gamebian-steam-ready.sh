@@ -79,22 +79,10 @@ gamebian_steam_logged_in() {
 }
 
 # LightDM autologin → gamescope when Steam is installed and the user is signed in.
-gamebian_steam_autologin_ready() {
+gamebian_steam_kiosk_ready() {
 	if ! gamebian_steam_client_installed; then
 		return 1
 	fi
-	gamebian_steam_logged_in
-}
-
-gamebian_steam_kiosk_ready() {
-	gamebian_steam_autologin_ready
-}
-
-gamebian_steam_setup_complete() {
-	gamebian_steam_kiosk_ready
-}
-
-gamebian_steam_needs_reboot_notice() {
 	gamebian_steam_logged_in
 }
 

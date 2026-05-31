@@ -94,7 +94,7 @@ _try_install_steam() {
 	if _as_root apt-get update \
 		&& _as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y steam-installer; then
 		if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then
-			${_sudo} ln -sf ../games/steam /usr/bin/steam 2>/dev/null || true
+			_as_root ln -sf ../games/steam /usr/bin/steam 2>/dev/null || true
 		fi
 		_find_steam_bin && return 0
 	fi
@@ -106,10 +106,9 @@ _find_steam_bin || _try_install_steam
 if [ -z "${steam_bin}" ]; then
 	echo ""
 	echo "Steam install failed." >&2
-	echo "From another machine, copy and run:" >&2
-	echo "  scp …/scripts/install-steam-trixie.sh user@host:/tmp/" >&2
-	echo "  sudo /tmp/install-steam-trixie.sh" >&2
-	echo "Or on this system:" >&2
+	echo "Repair apt (sid pins / i386) and retry:" >&2
+	echo "  sudo gamebian-install-steam" >&2
+	echo "Or manually:" >&2
 	echo "  sudo dpkg --add-architecture i386 && sudo apt update" >&2
 	echo "  sudo apt install -y steam-installer" >&2
 	read -r -p "$(printf '\nPress Enter to close.')" || true
