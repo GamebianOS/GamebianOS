@@ -6,10 +6,10 @@
 # (same LightDM login; autologin reset to openbox). Opt out of -steamos3: GAMEBIAN_STEAM_NO_STEAMOS3=1.
 # Set GAMEBIAN_GAMESCOPE_WINDOWED=1 to drop -f (debug / windowed).
 # Set GAMEBIAN_SKIP_GAMESCOPE=1 to skip gamescope (VMs without Vulkan DRM / llvmpipe).
-# LightDM kiosk: by default gamescope is NOT nested (-e). -e embeds X11 Steam in a desktop window —
-# bare X+kiosk sessions often look like huge black borders + BPM only in one corner unless -W/-H are set.
-# Toggle fullscreen if stuck: Meta/Super+F (gamescope default). Nested Openbox launcher still uses -e.
-# Set GAMEBIAN_GAMESCOPE_KIOSK_EMBED=1 to restore old `gamescope -e …` kiosk behaviour if needed.
+# -e (--steam) enables gamescope Steam integration (steamcompmgr input routing). Required for
+# controller input in games; omitting it breaks gamepads in the kiosk session. Opt out:
+# GAMEBIAN_GAMESCOPE_NO_STEAM=1. Legacy kiosk-only opt-out: GAMEBIAN_GAMESCOPE_KIOSK_EMBED=0.
+# Toggle fullscreen if stuck: Meta/Super+F (gamescope default).
 # Optional kiosk output size when not embedding: GAMEBIAN_GAMESCOPE_WH="-W 1920 -H 1200" (match your panel).
 # If unset, the LightDM kiosk session auto-fills -W/-H from `xrandr` (gamescope defaults to 1280x720 otherwise,
 # which often looks like a small Big Picture / gamepad UI in the top-left with black borders). Disable with
@@ -154,21 +154,26 @@ case "${GAMEBIAN_GAMESCOPE_WINDOWED:-}" in
 	1|yes|true|YES|TRUE) FULLSCREEN="" ;;
 esac
 
-# Bare LightDM+Xorg kiosk: omit -e so gamescope runs as full compositor (-W/-H work). Nested desktop: use -e.
+# Steam integration (-e) for controller input in games and stable Guide/chord handling.
 _EMBED_UNDER_X=""
-if [ -z "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-	_EMBED_UNDER_X="-e"
-else
+case "${GAMEBIAN_GAMESCOPE_NO_STEAM:-}" in
+	1|yes|true|YES|TRUE) ;;
+	*) _EMBED_UNDER_X="-e" ;;
+esac
+if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 	case "${GAMEBIAN_GAMESCOPE_KIOSK_EMBED:-}" in
-		1|yes|true|YES|TRUE) _EMBED_UNDER_X="-e" ;;
+		0|no|false|NO|FALSE) _EMBED_UNDER_X="" ;;
 	esac
 fi
 
-# Optional explicit kiosk output/game resolution split (gamescope --help; ignored when -e is set).
+# Optional kiosk output size (-W/-H) and game render size (-w/-h); see gamescope --help.
+# Kiosk autologin: auto-fills -W/-H from xrandr unless GAMEBIAN_GAMESCOPE_WH or
+# GAMEBIAN_GAMESCOPE_NO_AUTO_WH=1 is set. With -e (default), -W/-H still apply in gamescope 3.16+.
 _GAMESCOPE_WH=""
+_GAMESCOPE_GAME_WH=""
 if [ -n "${GAMEBIAN_GAMESCOPE_WH:-}" ]; then
 	_GAMESCOPE_WH="${GAMEBIAN_GAMESCOPE_WH}"
-elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -z "${_EMBED_UNDER_X}" ]; then
+elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 	case "${GAMEBIAN_GAMESCOPE_NO_AUTO_WH:-}" in
 		1|yes|true|YES|TRUE) ;;
 		*)
@@ -181,12 +186,19 @@ elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -z "${_EMBED_UNDER_X}" ]; the
 			;;
 	esac
 fi
+if [ -n "${GAMEBIAN_GAMESCOPE_GAME_WH:-}" ]; then
+	_GAMESCOPE_GAME_WH="${GAMEBIAN_GAMESCOPE_GAME_WH}"
+fi
+_GAMESCOPE_REFRESH=""
+if [ -n "${GAMEBIAN_GAMESCOPE_REFRESH:-}" ]; then
+	_GAMESCOPE_REFRESH="-r ${GAMEBIAN_GAMESCOPE_REFRESH}"
+fi
 
 # Steam UI mode: gamepad (default), classic Big Picture, or plain Steam.
-_steam_modes="-gamepadui -bigpicture"
+_steam_mode="-gamepadui"
 case "${STEAM_BIGPICTURE_UI:-gamepad}" in
-	classic|bigpicture) _steam_modes="-bigpicture" ;;
-	plain|desktop) _steam_modes="" ;;
+	classic|bigpicture) _steam_mode="-bigpicture" ;;
+	plain|desktop) _steam_mode="" ;;
 esac
 
 # Under gamescope, Steam uses the SteamOS power menu and expects steamos-session-select for
@@ -209,7 +221,7 @@ case "${GAMEBIAN_STEAM_NO_STEAMOS3:-}" in
 		;;
 esac
 
-log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} steamos3=${_steam_extras:-none} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
+log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} game_wh=${_GAMESCOPE_GAME_WH:-unset} refresh=${_GAMESCOPE_REFRESH:-unset} steamos3=${_steam_extras:-none} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
 
 # Debian Steam layout: ensure ~/.local/share/Steam points at debian-installation.
 if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
@@ -250,15 +262,25 @@ gamebian_stop_gamescope_pid() {
 
 _run_gamescope() {
 	_steam_args="$1"
+	_xwayland=""
+	if [ -n "${_EMBED_UNDER_X}" ]; then
+		case "${GAMEBIAN_GAMESCOPE_XWAYLAND_COUNT:-2}" in
+			0|no|off|OFF) ;;
+			*)
+				_xwc="${GAMEBIAN_GAMESCOPE_XWAYLAND_COUNT:-2}"
+				_xwayland="--xwayland-count ${_xwc}"
+				;;
+		esac
+	fi
 	if [ -n "${GAMEBIAN_VK_ICD_FILENAMES:-}" ]; then
 		export VK_ICD_FILENAMES="${GAMEBIAN_VK_ICD_FILENAMES}"
 	fi
 	case "${GAMEBIAN_GAMESCOPE_DISABLE_WSI:-}" in
 		1|yes|true|YES|TRUE) export ENABLE_GAMESCOPE_WSI=0 ;;
 	esac
-	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
+	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
 	# shellcheck disable=SC2086
-	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
+	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
 	_gs_pid=$!
 	_rc=0
 	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
@@ -288,17 +310,15 @@ _launch() {
 	_rc=1
 	_gamescope_tried=0
 	if [ "$_use_gamescope" -eq 1 ]; then
-		for _mode in $_steam_modes; do
-			_gamescope_tried=1
-			if _run_gamescope "$_mode"; then
-				return 0
-			fi
-			log "gamescope exited $? (mode=${_mode}; common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
-			if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-				&& [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
-				return 0
-			fi
-		done
+		_gamescope_tried=1
+		if _run_gamescope "$_steam_mode"; then
+			return 0
+		fi
+		log "gamescope exited $? (mode=${_steam_mode}; common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
+		if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
+			&& [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
+			return 0
+		fi
 		if [ "${_gamescope_tried}" -eq 1 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 			log "kiosk: gamescope unavailable — starting Steam on X once (no relaunch loop; GAMEBIAN_SKIP_GAMESCOPE=1 in steam-gamescope.env to skip gamescope)"
 			_use_gamescope=0
@@ -306,15 +326,11 @@ _launch() {
 	fi
 	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 		log "kiosk: gamescope unavailable or exited — starting Steam on X"
-		for _mode in $_steam_modes; do
-			_steam_direct "$_mode"
-		done
+		_steam_direct "$_steam_mode"
 		return 1
 	fi
 	log "starting Steam without gamescope"
-	for _mode in $_steam_modes; do
-		_steam_direct "$_mode"
-	done
+	_steam_direct "$_steam_mode"
 	return 1
 }
 

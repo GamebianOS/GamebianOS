@@ -43,6 +43,18 @@ gamebian_clear_steam_without_gamescope_markers() {
 	fi
 }
 
+# Gamescope WSI breaks Steam Input in many titles; disable unless HDR needs it.
+gamebian_apply_gamescope_steam_input_defaults() {
+	case "${GAMEBIAN_GAMESCOPE_ENABLE_WSI:-}" in
+		1|yes|true|YES|TRUE) ;;
+		*) export ENABLE_GAMESCOPE_WSI=0 ;;
+	esac
+	case "${GAMEBIAN_GAMESCOPE_NO_STEAM:-}" in
+		1|yes|true|YES|TRUE) return 0 ;;
+	esac
+	export STEAM_MULTIPLE_XWAYLANDS="${STEAM_MULTIPLE_XWAYLANDS:-1}"
+}
+
 # Source /etc/default + ~/.config/gamebian/steam-gamescope.env; optional hybrid auto-tune.
 gamebian_source_steam_gamescope_env() {
 	if [ -r /etc/default/gamebian-steam-gamescope ]; then
@@ -58,5 +70,6 @@ gamebian_source_steam_gamescope_env() {
 		set +a
 	fi
 	gamebian_apply_hybrid_gpu_gamescope_defaults
+	gamebian_apply_gamescope_steam_input_defaults
 	gamebian_clear_steam_without_gamescope_markers
 }

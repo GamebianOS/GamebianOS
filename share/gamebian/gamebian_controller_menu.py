@@ -822,13 +822,30 @@ def close_removed(opened: dict[str, evdev.InputDevice], grabbed: set[str]) -> No
             pass
 
 
+def gamescope_steam_active() -> bool:
+    """gamescope + Steam Big Picture running (kiosk or nested under Openbox)."""
+    uid = os.getuid()
+    try:
+        gs = subprocess.run(
+            ["pgrep", "-u", str(uid), "-x", "gamescope"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        )
+        if gs.returncode != 0:
+            return False
+        return steam_is_running() and _steam_process_uses_gamepadui()
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def should_grab_guide_input(cfg: configparser.ConfigParser) -> bool:
     """Exclusive evdev grab on Openbox so Guide/Home does not also reach Steam/X."""
     if not cfg.getboolean("trigger", "grab_guide", fallback=True):
         return False
     if _boot_live() or not openbox_running():
         return False
-    if in_exclusive_gamescope_kiosk() or retroarch_running():
+    if in_exclusive_gamescope_kiosk() or retroarch_running() or gamescope_steam_active():
         return False
     if cfg.getboolean("trigger", "skip_when_steam_running", fallback=True) and steam_bigpicture_on_openbox():
         return False
@@ -1703,19 +1720,12 @@ def run() -> None:
                 "skip_when_steam_running",
                 fallback=True,
             )
-            if skip_steam_ui and in_exclusive_gamescope_kiosk():
-                trigger = TriggerState(
-                    cfg.get("trigger", "mode", fallback="guide"),
-                    cfg.getboolean("trigger", "keyboard_super", fallback=True),
-                )
-                continue
-            if skip_steam_ui and steam_bigpicture_on_openbox():
-                trigger = TriggerState(
-                    cfg.get("trigger", "mode", fallback="guide"),
-                    cfg.getboolean("trigger", "keyboard_super", fallback=True),
-                )
-                continue
-            if skip_steam_ui and retroarch_running():
+            if skip_steam_ui and (
+                in_exclusive_gamescope_kiosk()
+                or gamescope_steam_active()
+                or steam_bigpicture_on_openbox()
+                or retroarch_running()
+            ):
                 trigger = TriggerState(
                     cfg.get("trigger", "mode", fallback="guide"),
                     cfg.getboolean("trigger", "keyboard_super", fallback=True),
