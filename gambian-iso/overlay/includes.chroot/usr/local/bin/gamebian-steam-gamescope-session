@@ -93,8 +93,8 @@ fi
 
 # Kiosk ↔ desktop handoff: stay in this LightDM login; relaunch gamescope when Openbox ends.
 while :; do
-	gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
 	gamebian_kiosk_marker_set 2>/dev/null || true
+	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
 
 	/usr/local/bin/gamebian-steam-bigpicture "$@"
 	_rc=$?
@@ -104,7 +104,14 @@ while :; do
 		printf '%s gamescope-session: openbox desktop — waiting (same login)\n' \
 			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
 		while pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; do
-			sleep 1
+			if gamebian_request_gamescope_kiosk_pending 2>/dev/null; then
+				gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+				printf '%s gamescope-session: Enter Steam requested — leaving Openbox\n' \
+					"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+				openbox --exit 2>/dev/null || pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+				break
+			fi
+			sleep 0.5
 		done
 		printf '%s gamescope-session: openbox ended — return to gamescope kiosk\n' \
 			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
@@ -113,6 +120,7 @@ while :; do
 			exit 0
 		fi
 		if gamebian_steam_kiosk_ready 2>/dev/null; then
+			gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
 			continue
 		fi
 		printf '%s gamescope-session: Steam not kiosk-ready — stopping supervisor\n' \

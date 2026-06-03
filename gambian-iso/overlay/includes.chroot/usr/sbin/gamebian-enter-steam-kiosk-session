@@ -69,10 +69,44 @@ _stop_steam_gamescope() {
 	fi
 }
 
-_return_to_gamescope_from_openbox() {
-	log "openbox --exit (gamescope-session supervisor will relaunch kiosk)"
-	openbox --exit
-	exit 0
+_reenter_gamescope_same_login() {
+	log "re-enter gamescope on ${DISPLAY} (same LightDM login, no greeter)"
+	_stop_steam_gamescope
+
+	if gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+		gamebian_request_gamescope_kiosk 2>/dev/null || true
+		_i=0
+		while [ "${_i}" -lt 60 ]; do
+			if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+				|| ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+				log "gamescope-session took over (gamescope or openbox gone)"
+				gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
+				exit 0
+			fi
+			sleep 0.5
+			_i=$((_i + 1))
+		done
+		log "supervisor slow — nudging openbox --exit"
+		openbox --exit 2>/dev/null || true
+		exit 0
+	fi
+
+	log "no supervisor — launching gamescope on current X"
+	gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
+	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+	openbox --exit 2>/dev/null || pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+	sleep 0.5
+	if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+		gamebian_source_steam_gamescope_env
+	fi
+	export GAMEBIAN_GAMESCOPE_SESSION=1
+	export DESKTOP_SESSION=gamebian-steam-gamescope
+	export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
+	export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+	gamebian_kiosk_marker_set 2>/dev/null || true
+	exec /usr/local/bin/gamebian-steam-bigpicture
 }
 
 _end_session_for_gamescope() {
@@ -177,10 +211,11 @@ if _on_openbox_desktop; then
 	if ! _enable_lightdm_gamescope; then
 		log "could not enable Steam session for next boot (sudo /usr/sbin/gamebian-enable-steam-lightdm-session)"
 	fi
-	_stop_steam_gamescope
-	if gamebian_kiosk_openbox_handoff_active 2>/dev/null \
+	# After Switch to Desktop: same X session — never tear down LightDM login.
+	if [ -f "${HOME}/.config/gamebian/kiosk-openbox-handoff" ] \
+		|| gamebian_kiosk_openbox_handoff_active 2>/dev/null \
 		|| gamebian_gamescope_session_supervisor_running 2>/dev/null; then
-		_return_to_gamescope_from_openbox
+		_reenter_gamescope_same_login
 	fi
 	_end_session_for_gamescope
 fi

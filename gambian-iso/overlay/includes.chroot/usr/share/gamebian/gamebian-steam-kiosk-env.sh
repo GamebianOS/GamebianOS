@@ -4,6 +4,7 @@
 GAMEBIAN_KIOSK_MARKER="${HOME}/.config/gamebian/in-gamescope-kiosk-session"
 GAMEBIAN_SWITCH_OPENBOX="${HOME}/.config/gamebian/switch-to-openbox"
 GAMEBIAN_KIOSK_OPENBOX_HANDOFF="${HOME}/.config/gamebian/kiosk-openbox-handoff"
+GAMEBIAN_REQUEST_GAMESCOPE_KIOSK="${HOME}/.config/gamebian/request-gamescope-kiosk"
 
 gamebian_kiosk_marker_set() {
 	mkdir -p "${HOME}/.config/gamebian"
@@ -31,6 +32,19 @@ gamebian_kiosk_openbox_handoff_active() {
 
 gamebian_gamescope_session_supervisor_running() {
 	pgrep -u "$(id -un)" -f '[g]amebian-steam-gamescope-session' >/dev/null 2>&1
+}
+
+gamebian_request_gamescope_kiosk() {
+	mkdir -p "${HOME}/.config/gamebian"
+	: >"${GAMEBIAN_REQUEST_GAMESCOPE_KIOSK}"
+}
+
+gamebian_request_gamescope_kiosk_clear() {
+	rm -f "${GAMEBIAN_REQUEST_GAMESCOPE_KIOSK}" 2>/dev/null || true
+}
+
+gamebian_request_gamescope_kiosk_pending() {
+	[ -f "${GAMEBIAN_REQUEST_GAMESCOPE_KIOSK}" ]
 }
 
 gamebian_request_switch_to_openbox() {
