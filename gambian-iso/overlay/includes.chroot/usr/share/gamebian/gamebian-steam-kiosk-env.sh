@@ -3,6 +3,7 @@
 
 GAMEBIAN_KIOSK_MARKER="${HOME}/.config/gamebian/in-gamescope-kiosk-session"
 GAMEBIAN_SWITCH_OPENBOX="${HOME}/.config/gamebian/switch-to-openbox"
+GAMEBIAN_KIOSK_OPENBOX_HANDOFF="${HOME}/.config/gamebian/kiosk-openbox-handoff"
 
 gamebian_kiosk_marker_set() {
 	mkdir -p "${HOME}/.config/gamebian"
@@ -10,7 +11,26 @@ gamebian_kiosk_marker_set() {
 }
 
 gamebian_kiosk_marker_clear() {
-	rm -f "${GAMEBIAN_KIOSK_MARKER}" "${GAMEBIAN_SWITCH_OPENBOX}" 2>/dev/null || true
+	rm -f "${GAMEBIAN_KIOSK_MARKER}" "${GAMEBIAN_SWITCH_OPENBOX}" \
+		"${GAMEBIAN_KIOSK_OPENBOX_HANDOFF}" 2>/dev/null || true
+}
+
+gamebian_kiosk_openbox_handoff_set() {
+	mkdir -p "${HOME}/.config/gamebian"
+	: >"${GAMEBIAN_KIOSK_OPENBOX_HANDOFF}"
+}
+
+gamebian_kiosk_openbox_handoff_clear() {
+	rm -f "${GAMEBIAN_KIOSK_OPENBOX_HANDOFF}" 2>/dev/null || true
+}
+
+# True when Openbox is the in-session desktop after Switch to Desktop (same LightDM login).
+gamebian_kiosk_openbox_handoff_active() {
+	[ -f "${GAMEBIAN_KIOSK_OPENBOX_HANDOFF}" ]
+}
+
+gamebian_gamescope_session_supervisor_running() {
+	pgrep -u "$(id -un)" -f '[g]amebian-steam-gamescope-session' >/dev/null 2>&1
 }
 
 gamebian_request_switch_to_openbox() {
@@ -59,6 +79,7 @@ gamebian_handoff_to_openbox_desktop() {
 	gamebian_wait_steam_kiosk_stopped || gamebian_kill_steam_kiosk_tree
 
 	rm -f "${GAMEBIAN_SWITCH_OPENBOX}" "${GAMEBIAN_KIOSK_MARKER}" 2>/dev/null || true
+	gamebian_kiosk_openbox_handoff_set
 	unset GAMEBIAN_GAMESCOPE_SESSION
 	export DISPLAY="${DISPLAY:-:0}"
 	export DESKTOP_SESSION=gamebian-desktop
@@ -68,9 +89,13 @@ gamebian_handoff_to_openbox_desktop() {
 
 	if pgrep -u "$_u" -x openbox >/dev/null 2>&1; then
 		printf '%s openbox already running\n' "$_ts" >>"$_log" 2>/dev/null || true
+		gamebian_kiosk_openbox_handoff_set
 		return 0
 	fi
 
-	printf '%s exec openbox-session\n' "$_ts" >>"$_log" 2>/dev/null || true
-	exec /usr/bin/openbox-session
+	# Do not exec: gamebian-steam-gamescope-session must keep supervising (desktop → Steam).
+	printf '%s start openbox-session (background, same LightDM login)\n' "$_ts" >>"$_log" 2>/dev/null || true
+	gamebian_kiosk_openbox_handoff_set
+	/usr/bin/openbox-session >>"$_log" 2>&1 &
+	return 0
 }

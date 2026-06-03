@@ -342,6 +342,7 @@ if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 		if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
 			log "Switch to Desktop: openbox already running — refresh desktop notices"
 			rm -f "${_handoff}" 2>/dev/null || true
+			gamebian_kiosk_openbox_handoff_set 2>/dev/null || true
 			gamebian_kiosk_marker_clear 2>/dev/null || true
 			if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
 				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
@@ -350,6 +351,8 @@ if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 		fi
 		log "Switch to Desktop: handoff to openbox-session"
 		gamebian_handoff_to_openbox_desktop
+		# Return to gamescope-session supervisor (same LightDM login).
+		exit 0
 	fi
 	exit $?
 fi

@@ -69,10 +69,16 @@ _stop_steam_gamescope() {
 	fi
 }
 
+_return_to_gamescope_from_openbox() {
+	log "openbox --exit (gamescope-session supervisor will relaunch kiosk)"
+	openbox --exit
+	exit 0
+}
+
 _end_session_for_gamescope() {
-	# Prefer ending Openbox only — loginctl terminate-session often lands on the greeter.
+	# Openbox-only LightDM login (first-boot / prefer-desktop): end session so autologin reruns.
 	if _on_openbox_desktop; then
-		log "openbox --exit (LightDM should autologin gamescope)"
+		log "openbox --exit (LightDM autologin → gamescope dispatcher)"
 		openbox --exit
 		exit 0
 	fi
@@ -172,6 +178,10 @@ if _on_openbox_desktop; then
 		log "could not enable Steam session for next boot (sudo /usr/sbin/gamebian-enable-steam-lightdm-session)"
 	fi
 	_stop_steam_gamescope
+	if gamebian_kiosk_openbox_handoff_active 2>/dev/null \
+		|| gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+		_return_to_gamescope_from_openbox
+	fi
 	_end_session_for_gamescope
 fi
 
