@@ -71,7 +71,12 @@ _stop_steam_gamescope() {
 
 _reenter_gamescope_same_login() {
 	log "re-enter gamescope on ${DISPLAY} (same LightDM login, no greeter)"
-	_stop_steam_gamescope
+	if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "gamescope already fullscreen — only stopping openbox if needed"
+		pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+		exit 0
+	fi
 
 	if gamebian_gamescope_session_supervisor_running 2>/dev/null; then
 		gamebian_request_gamescope_kiosk 2>/dev/null || true
@@ -90,6 +95,8 @@ _reenter_gamescope_same_login() {
 		openbox --exit 2>/dev/null || true
 		exit 0
 	fi
+
+	_stop_steam_gamescope
 
 	log "no supervisor — launching gamescope on current X"
 	gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
@@ -199,6 +206,35 @@ log "start DISPLAY=$DISPLAY user=$(id -un)"
 
 if _in_exclusive_kiosk; then
 	log "already in gamescope kiosk"
+	exit 0
+fi
+
+# gamebian-steam-gamescope-session owns the login — menu must not spawn a second bigpicture.
+if gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+	if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "supervisor active + openbox — hand off to gamescope"
+		if ! _enable_lightdm_gamescope; then
+			log "warning: could not update LightDM steam preference"
+		fi
+		_reenter_gamescope_same_login
+	fi
+	if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "supervisor active — gamescope already running"
+		exit 0
+	fi
+	log "supervisor active — request gamescope kiosk"
+	gamebian_request_gamescope_kiosk 2>/dev/null || true
+	_i=0
+	while [ "${_i}" -lt 40 ]; do
+		if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1; then
+			log "gamescope started by supervisor"
+			exit 0
+		fi
+		sleep 0.5
+		_i=$((_i + 1))
+	done
+	log "supervisor did not start gamescope in time"
 	exit 0
 fi
 

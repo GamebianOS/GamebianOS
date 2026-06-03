@@ -822,8 +822,27 @@ def close_removed(opened: dict[str, evdev.InputDevice], grabbed: set[str]) -> No
             pass
 
 
-def gamescope_steam_active() -> bool:
-    """gamescope + Steam Big Picture running (kiosk or nested under Openbox)."""
+def _steam_client_process_running() -> bool:
+    """Steam client running (main binary or gamepadui argv)."""
+    if steam_is_running():
+        return True
+    if _steam_process_uses_gamepadui():
+        return True
+    uid = os.getuid()
+    try:
+        proc = subprocess.run(
+            ["pgrep", "-u", str(uid), "-f", r"[s]team"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def in_steam_gamescope_session() -> bool:
+    """gamescope kiosk: Steam owns Guide (Openbox may still exist after handoff)."""
     uid = os.getuid()
     try:
         gs = subprocess.run(
@@ -834,9 +853,45 @@ def gamescope_steam_active() -> bool:
         )
         if gs.returncode != 0:
             return False
-        return steam_is_running() and _steam_process_uses_gamepadui()
+        return _steam_client_process_running()
     except (OSError, subprocess.TimeoutExpired):
         return False
+
+
+def gamescope_steam_active() -> bool:
+    """gamescope + Steam Big Picture running (kiosk or nested under Openbox)."""
+    if not in_steam_gamescope_session():
+        return False
+    return _steam_process_uses_gamepadui() or steam_is_running()
+
+
+def controller_menu_suppressed(cfg: configparser.ConfigParser) -> bool:
+    """Do not open Gamebian menu — Steam/gamescope/RetroArch own the gamepad."""
+    if not cfg.getboolean("trigger", "skip_when_steam_running", fallback=True):
+        return False
+    if retroarch_running():
+        return True
+    if in_steam_gamescope_session():
+        return True
+    if gamescope_steam_active():
+        return True
+    if steam_bigpicture_on_openbox():
+        return True
+    return False
+
+
+def is_menu_hotkey_event(event: evdev.InputEvent, cfg: configparser.ConfigParser) -> bool:
+    """Guide/Home/Super keys that open the controller menu."""
+    if event.type != ecodes.EV_KEY or event.value != 1:
+        return False
+    if event.code in (ecodes.BTN_MODE, ecodes.KEY_HOMEPAGE):
+        return True
+    if cfg.getboolean("trigger", "keyboard_super", fallback=True) and event.code in (
+        ecodes.KEY_LEFTMETA,
+        ecodes.KEY_RIGHTMETA,
+    ):
+        return True
+    return False
 
 
 def should_grab_guide_input(cfg: configparser.ConfigParser) -> bool:
@@ -845,7 +900,7 @@ def should_grab_guide_input(cfg: configparser.ConfigParser) -> bool:
         return False
     if _boot_live() or not openbox_running():
         return False
-    if in_exclusive_gamescope_kiosk() or retroarch_running() or gamescope_steam_active():
+    if controller_menu_suppressed(cfg) or retroarch_running():
         return False
     if cfg.getboolean("trigger", "skip_when_steam_running", fallback=True) and steam_bigpicture_on_openbox():
         return False
@@ -1249,7 +1304,7 @@ def is_steam_menu_entry(label: str, command: str) -> bool:
 
 def launch_steam_from_controller_menu(env: dict[str, str]) -> None:
     """Signed out → Steam login on Openbox; signed in → end desktop session, gamescope kiosk."""
-    if in_exclusive_gamescope_kiosk():
+    if in_exclusive_gamescope_kiosk() or in_steam_gamescope_session():
         notify_user("Already in Steam", "You are in the gamescope Steam session.")
         return
     if steam_account_logged_in():
@@ -1706,6 +1761,10 @@ def run() -> None:
                 for ev in dev.read():
                     if ev.type == ecodes.EV_SYN:
                         continue
+                    if controller_menu_suppressed(cfg) and is_menu_hotkey_event(
+                        ev, cfg
+                    ):
+                        continue
                     if trigger.process(ev) and items:
                         fired = True
                         break
@@ -1715,17 +1774,7 @@ def run() -> None:
                 break
 
         if fired and items:
-            skip_steam_ui = cfg.getboolean(
-                "trigger",
-                "skip_when_steam_running",
-                fallback=True,
-            )
-            if skip_steam_ui and (
-                in_exclusive_gamescope_kiosk()
-                or gamescope_steam_active()
-                or steam_bigpicture_on_openbox()
-                or retroarch_running()
-            ):
+            if controller_menu_suppressed(cfg):
                 trigger = TriggerState(
                     cfg.get("trigger", "mode", fallback="guide"),
                     cfg.getboolean("trigger", "keyboard_super", fallback=True),

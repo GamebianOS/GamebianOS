@@ -95,6 +95,7 @@ fi
 while :; do
 	gamebian_kiosk_marker_set 2>/dev/null || true
 	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+	gamebian_controller_menu_pause 2>/dev/null || true
 
 	/usr/local/bin/gamebian-steam-bigpicture "$@"
 	_rc=$?

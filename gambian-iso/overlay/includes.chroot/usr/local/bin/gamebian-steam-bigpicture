@@ -18,6 +18,8 @@
 #   GAMEBIAN_VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json  (colon-separated list ok; name varies — ls icd.d)
 #   GAMEBIAN_GAMESCOPE_EXTRA_ARGS='--prefer-vk-device …'  # run: gamescope --help
 # Optional: GAMEBIAN_GAMESCOPE_DISABLE_WSI=1 → ENABLE_GAMESCOPE_WSI=0 (workaround some NV hybrid hangs).
+# Kiosk hides the mouse cursor when a USB mouse is plugged in (controller-only play): gamescope -C 0 by default.
+# Override delay (ms): GAMEBIAN_GAMESCOPE_HIDE_CURSOR_DELAY=3000; disable: -1 or GAMEBIAN_GAMESCOPE_NO_HIDE_CURSOR=1.
 # Persist for LightDM kiosk: ~/.config/gamebian/steam-gamescope.env (sourced by gamebian-steam-gamescope-session).
 
 LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/steam-bigpicture.log"
@@ -194,6 +196,24 @@ if [ -n "${GAMEBIAN_GAMESCOPE_REFRESH:-}" ]; then
 	_GAMESCOPE_REFRESH="-r ${GAMEBIAN_GAMESCOPE_REFRESH}"
 fi
 
+# Hide X cursor in kiosk (USB mouse often shows the default "X" pointer). gamescope -C = ms idle before hide.
+_GAMESCOPE_HIDE_CURSOR=""
+case "${GAMEBIAN_GAMESCOPE_NO_HIDE_CURSOR:-}" in
+	1|yes|true|YES|TRUE) ;;
+	*)
+		if [ -n "${GAMEBIAN_GAMESCOPE_HIDE_CURSOR_DELAY+x}" ]; then
+			case "${GAMEBIAN_GAMESCOPE_HIDE_CURSOR_DELAY}" in
+				-1|off|no|disable|DISABLE|OFF|NO) ;;
+				*)
+					_GAMESCOPE_HIDE_CURSOR="-C ${GAMEBIAN_GAMESCOPE_HIDE_CURSOR_DELAY}"
+					;;
+			esac
+		elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+			_GAMESCOPE_HIDE_CURSOR="-C 0"
+		fi
+		;;
+esac
+
 # Steam UI mode: gamepad (default), classic Big Picture, or plain Steam.
 _steam_mode="-gamepadui"
 case "${STEAM_BIGPICTURE_UI:-gamepad}" in
@@ -221,7 +241,7 @@ case "${GAMEBIAN_STEAM_NO_STEAMOS3:-}" in
 		;;
 esac
 
-log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} game_wh=${_GAMESCOPE_GAME_WH:-unset} refresh=${_GAMESCOPE_REFRESH:-unset} steamos3=${_steam_extras:-none} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
+log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} game_wh=${_GAMESCOPE_GAME_WH:-unset} refresh=${_GAMESCOPE_REFRESH:-unset} hide_cursor=${_GAMESCOPE_HIDE_CURSOR:-off} steamos3=${_steam_extras:-none} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
 
 # Debian Steam layout: ensure ~/.local/share/Steam points at debian-installation.
 if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
@@ -278,9 +298,9 @@ _run_gamescope() {
 	case "${GAMEBIAN_GAMESCOPE_DISABLE_WSI:-}" in
 		1|yes|true|YES|TRUE) export ENABLE_GAMESCOPE_WSI=0 ;;
 	esac
-	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
+	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_GAMESCOPE_HIDE_CURSOR $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
 	# shellcheck disable=SC2086
-	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
+	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_GAMESCOPE_HIDE_CURSOR $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
 	_gs_pid=$!
 	_rc=0
 	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
@@ -296,6 +316,15 @@ _run_gamescope() {
 		sleep 0.25
 	done
 	wait "$_gs_pid" 2>/dev/null || _rc=$?
+	# gamescope can exit 0 immediately when a second instance races the first.
+	if [ "${_rc}" -eq 0 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+		sleep 1
+		if ! pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+			&& ! pgrep -u "$(id -un)" -f 'gamescopereaper' >/dev/null 2>&1; then
+			log "gamescope exited 0 but no compositor left — treating as failure"
+			return 1
+		fi
+	fi
 	return $_rc
 }
 
@@ -325,8 +354,13 @@ _launch() {
 		fi
 	fi
 	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-		log "kiosk: gamescope unavailable or exited — starting Steam on X"
-		_steam_direct "$_steam_mode"
+		if gamebian_use_steam_without_gamescope 2>/dev/null \
+			|| [ -f "${HOME}/.config/gamebian/steam-without-gamescope" ]; then
+			log "kiosk: gamescope unavailable — Steam on X (steam-without-gamescope)"
+			_steam_direct "$_steam_mode"
+		else
+			log "kiosk: gamescope failed — not starting desktop Steam (would look like Openbox Steam)"
+		fi
 		return 1
 	fi
 	log "starting Steam without gamescope"
@@ -344,6 +378,7 @@ if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 			rm -f "${_handoff}" 2>/dev/null || true
 			gamebian_kiosk_openbox_handoff_set 2>/dev/null || true
 			gamebian_kiosk_marker_clear 2>/dev/null || true
+			gamebian_controller_menu_resume 2>/dev/null || true
 			if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
 				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
 			fi

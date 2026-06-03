@@ -47,6 +47,33 @@ gamebian_request_gamescope_kiosk_pending() {
 	[ -f "${GAMEBIAN_REQUEST_GAMESCOPE_KIOSK}" ]
 }
 
+# Stop listening for Guide/Home while gamescope+Steam own the gamepad (Openbox autostart leaves it running).
+gamebian_controller_menu_pause() {
+	_u="$(id -un)"
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl --user stop gamebian-controller-menu.service 2>/dev/null || true
+	fi
+	pkill -u "$_u" -TERM -f '[g]amebian-controller-menu' 2>/dev/null || true
+	sleep 0.2
+	pkill -u "$_u" -KILL -f '[g]amebian-controller-menu' 2>/dev/null || true
+}
+
+gamebian_controller_menu_resume() {
+	_u="$(id -un)"
+	if pgrep -u "$_u" -f '[g]amebian-controller-menu' >/dev/null 2>&1; then
+		return 0
+	fi
+	if ! command -v gamebian-controller-menu >/dev/null 2>&1; then
+		return 1
+	fi
+	export DISPLAY="${DISPLAY:-:0}"
+	if command -v systemctl >/dev/null 2>&1; then
+		systemctl --user start gamebian-controller-menu.service 2>/dev/null && return 0
+	fi
+	gamebian-controller-menu >/dev/null 2>&1 &
+	return 0
+}
+
 gamebian_request_switch_to_openbox() {
 	mkdir -p "${HOME}/.config/gamebian"
 	: >"${GAMEBIAN_SWITCH_OPENBOX}"
@@ -104,6 +131,7 @@ gamebian_handoff_to_openbox_desktop() {
 	if pgrep -u "$_u" -x openbox >/dev/null 2>&1; then
 		printf '%s openbox already running\n' "$_ts" >>"$_log" 2>/dev/null || true
 		gamebian_kiosk_openbox_handoff_set
+		gamebian_controller_menu_resume
 		return 0
 	fi
 
@@ -111,5 +139,7 @@ gamebian_handoff_to_openbox_desktop() {
 	printf '%s start openbox-session (background, same LightDM login)\n' "$_ts" >>"$_log" 2>/dev/null || true
 	gamebian_kiosk_openbox_handoff_set
 	/usr/bin/openbox-session >>"$_log" 2>&1 &
+	sleep 1
+	gamebian_controller_menu_resume
 	return 0
 }
