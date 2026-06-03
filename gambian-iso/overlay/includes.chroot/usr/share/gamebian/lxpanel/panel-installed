@@ -78,5 +78,8 @@ Plugin {
 Plugin {
   type=batt
   Config {
+    HideIfNoBattery=1
+    AlarmCommand=
+    AlarmTime=0
   }
 }
