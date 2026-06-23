@@ -19,7 +19,8 @@ fi
 # Calamares shellprocess helpers.
 for _sbin in \
   "$TARGET/usr/local/sbin/gamebian-web-install" \
-  "$TARGET/usr/local/sbin/gamebian-nm-user-perms.sh"; do
+  "$TARGET/usr/local/sbin/gamebian-nm-user-perms.sh" \
+  "$TARGET/usr/local/sbin/gamebian-add-user-input-group.sh"; do
   if [[ -f "$_sbin" ]]; then
     chmod 0755 "$_sbin"
   fi

@@ -895,7 +895,7 @@ def is_menu_hotkey_event(event: evdev.InputEvent, cfg: configparser.ConfigParser
 
 
 def should_grab_guide_input(cfg: configparser.ConfigParser) -> bool:
-    """Exclusive evdev grab on Openbox so Guide/Home does not also reach Steam/X."""
+    """Exclusive evdev grab on Openbox gamepads so Guide/Home does not also reach Steam/X."""
     if not cfg.getboolean("trigger", "grab_guide", fallback=True):
         return False
     if _boot_live() or not openbox_running():
@@ -915,7 +915,9 @@ def sync_guide_grabs(
     want = should_grab_guide_input(cfg)
     for path, dev in list(opened.items()):
         try:
-            if want:
+            # Never grab keyboards / combo remotes (e.g. Logitech K400): evdev grab
+            # blocks the whole device, so X11 loses keyboard and pointer input.
+            if want and _is_joystick_capabilities(dev):
                 if path not in grabbed:
                     dev.grab()
                     grabbed.add(path)

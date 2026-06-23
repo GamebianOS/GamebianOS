@@ -1,8 +1,10 @@
 # GamebianOS
 
-**GamebianOS** is Debian built for one job: install once, then boot like a console into **Steam in Big Picture** inside **gamescope**. Think of it as a **game console image** on Debian rather than a full desktop sprawl: sign in once, drive Steam with a controller, and keep a normal Openbox session when you need it.
+**GamebianOS** is Debian built for one job: install once, then boot like a console into **Steam Big Picture** inside **gamescope**. Same packages and mirrors as Debian; lightweight Openbox when you need a real desktop.
 
-It is still **Debian underneath** — same packages, mirrors, and tooling — with a lightweight Openbox base, Calamares, and glue for LightDM, Steam, and gamescope.
+Think of it as a **game console image** on Debian rather than full desktop sprawl: sign in once, drive Steam with a controller, and keep a normal Openbox session when you need it.
+
+It is still **Debian underneath** — same packages, mirrors, and tooling you already know — with a lightweight Openbox base, Calamares, and glue for LightDM, Steam, and gamescope.
 
 ## What it is
 
@@ -14,9 +16,9 @@ It is still **Debian underneath** — same packages, mirrors, and tooling — wi
 
 | Stage | Experience |
 |-------|------------|
-| **Live ISO** | Try or install with the Gamebian overlay; Calamares installs to disk. |
-| **First boot** | Openbox desktop, first-run Steam wizard (with install-time warnings), then reboot. |
-| **Everyday use** | Autologin into gamescope running Steam Big Picture (`-gamepadui`, `-steamos3`). |
+| **Live ISO** | Try or install with the Gamebian overlay; Calamares installs to disk (`live` / `live`, usually autologin). |
+| **First boot (disk)** | Openbox desktop, first-run Steam wizard (with install-time warnings), then reboot or logout. |
+| **Everyday use** | Autologin into gamescope running Steam Big Picture (`-gamepadui`, `-steamos3`). Desktop mode stays available. |
 
 Optional pieces include **gamebian-web** (`:8844`) for remote ROM/store setup and a controller-friendly launcher menu (Guide / Home).
 
@@ -25,6 +27,28 @@ Optional pieces include **gamebian-web** (`:8844`) for remote ROM/store setup an
 - A **dedicated gaming PC** or handheld you treat like a console.
 - Anyone who wants **Steam on Debian** without hand-rolling gamescope, i386, contrib/non-free, and session glue.
 - Tinkerers who still want **real Debian** under the hood.
+
+## Quick start (build the ISO)
+
+```bash
+cd Build/gambian-iso
+./setup.sh
+./build.sh    # or: sudo lb build from GAMEBIANOS_BUILD_ROOT
+```
+
+Default build output: `/home/khinds/gamebianos-build-iso` (override with `GAMEBIANOS_BUILD_ROOT`).
+
+## Repository layout
+
+| Path | Role |
+|------|------|
+| `Build/gambian-iso/` | Live-build profile: `overlay/`, `hooks/`, package lists |
+| `Build/gambian-iso/setup.sh` | Merge overlay into `GAMEBIANOS_BUILD_ROOT`, Calamares, themes |
+| `Build/gambian-iso/build.sh` | Run `lb build` |
+| `Build/share/calamares-gamebian/` | Calamares modules and branding |
+| `Build/share/gamebian/` | Controller menu, `ensure-apt-contrib-nonfree.sh` (canonical APT helper) |
+| `Packages/gamebian-web/` | Web UI source (staged on ISO, installed by Calamares) |
+| `scripts/gamebian-sync-installed.sh` | Push overlay changes to an installed system for testing |
 
 ## The complete journey (build → live ISO → installed console)
 
@@ -172,16 +196,6 @@ This directory is the **live-build profile** (`overlay/`, `hooks/`, package list
 - **gamebian-web:** staged on ISO; installed on target by Calamares (`:8844` for ROM/store uploads).
 - **Steam / gamescope:** see [Steam / gamescope boot flow](#steam--gamescope-boot-and-session-flow) and [Debian trixie: Steam + gamescope](#debian-trixie-steam--gamescope-gamebian).
 - **Hybrid GPU (AMD iGPU + NVIDIA):** auto RADV selection at session start (`gamebian-steam-gamescope-env.sh`); override via `~/.config/gamebian/steam-gamescope.env` (see `steam-gamescope.env.example` in skel).
-
-## Related documentation
-
-| Topic | Section |
-|-------|---------|
-| Steam → gamescope boot flow | [below](#steam--gamescope-boot-and-session-flow) |
-| gamescope / Steam on Debian trixie | [below](#debian-trixie-steam--gamescope-gamebian) |
-| Installed system ↔ dev tree sync | [../../Docs/INSTALLED-SYNC.md](../../Docs/INSTALLED-SYNC.md) |
-| Library platforms (cores, apt) | [../../Docs/RETRO-PLATFORMS.md](../../Docs/RETRO-PLATFORMS.md) |
-| VirtualBox vs KVM | [../../Docs/VirtualBox-KVM.md](../../Docs/VirtualBox-KVM.md) |
 
 ---
 
@@ -441,7 +455,11 @@ sudo gamebian-install-steam          # missing steam-installer / sid apt repair
 | `/var/log/gamebian-install-gamescope.log` | Calamares / manual gamescope install |
 | `/var/log/lightdm/lightdm.log` | LightDM autologin / session selection |
 
-Optional tuning: copy `etc/skel/.config/gamebian/steam-gamescope.env.example` → `~/.config/gamebian/steam-gamescope.env` (`GAMEBIAN_SKIP_GAMESCOPE=1`, manual RADV, etc.).
+Optional tuning: copy `etc/skel/.config/gamebian/steam-gamescope.env.example` → `~/.config/gamebian/steam-gamescope.env`:
+
+- `GAMEBIAN_SKIP_GAMESCOPE=1` — VM / broken Vulkan fallback
+- `GAMEBIAN_VK_ICD_FILENAMES` — manual RADV on hybrid NVIDIA + AMD
+- `GAMEBIAN_GAMESCOPE_HIDE_CURSOR_DELAY` — kiosk mouse hide (default `-C 0` when a USB mouse is plugged in); `GAMEBIAN_GAMESCOPE_NO_HIDE_CURSOR=1` to disable
 
 ---
 
@@ -748,4 +766,4 @@ Production-ready when **B1–B4**, **C1–C3**, **D1–D3** (including **D1b**),
 
 ## In one sentence
 
-**GamebianOS is Debian, dressed for a single role: install once, then boot like a console into Steam inside gamescope.**
+**Install Debian once with Calamares, sign in to Steam on the desktop, reboot — then GamebianOS boots like a Steam Deck inside gamescope.**
