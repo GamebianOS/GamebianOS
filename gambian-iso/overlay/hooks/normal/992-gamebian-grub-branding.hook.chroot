@@ -17,11 +17,12 @@ if [ -d /usr/share/desktop-base/ceratopsian-theme ] && command -v update-alterna
 fi
 
 # Drop stale testing/unstable desktop-base symlinks if present.
-for _bad in /usr/share/desktop-base/active-theme /usr/share/desktop-base/homeworld-theme; do
+for _bad in /usr/share/desktop-base/active-theme /usr/share/desktop-base/homeworld-theme \
+	/usr/share/desktop-base/hardhat-theme /usr/share/desktop-base/spacefun-theme; do
 	[ -L "$_bad" ] || continue
 	_target="$(readlink "$_bad" 2>/dev/null || true)"
 	case "$_target" in
-		*hardhat*|*hard-hat*|*testing*) rm -f "$_bad" ;;
+		*hardhat*|*hard-hat*|*homeworld*|*testing*) rm -f "$_bad" ;;
 	esac
 done
 

@@ -1,3 +1,4 @@
+# Installed disk: gfx menu + wallpaper (same PNG as GRUB_BACKGROUND so 05_debian_theme skips Debian art).
 desktop-image: "../splash.png"
 title-color: "#ffffff"
 title-font: "Unifont Regular 16"

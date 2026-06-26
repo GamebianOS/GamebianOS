@@ -211,7 +211,8 @@ if [[ -f "$GAMEBIAN_SHARE/merge-calamares-gamebian.sh" ]]; then
   "$GAMEBIAN_SHARE/merge-calamares-gamebian.sh" "$BUILD_ROOT/config/includes.chroot" "$CAL_DESIGN"
 fi
 
-for f in "$OVERLAY"/hooks/normal/*.hook.chroot; do
+for f in "$OVERLAY"/hooks/normal/*.hook.chroot "$OVERLAY"/hooks/normal/*.hook.binary; do
+  [[ -f "$f" ]] || continue
   cp -a "$f" config/hooks/normal/
   chmod +x "config/hooks/normal/$(basename "$f")"
 done

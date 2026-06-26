@@ -1,0 +1,34 @@
+#!/bin/sh
+# Re-apply Gamebian GRUB GFX after lb binary (desktop-base / debian theme can overwrite splash).
+set -e
+
+SRC="config/bootloaders/grub-pc"
+[ -f "${SRC}/splash.png" ] || exit 0
+
+_apply_dir() {
+	_d="$1"
+	[ -d "${_d}" ] || return 0
+	mkdir -p "${_d}/live-theme"
+	cp -a "${SRC}/splash.png" "${_d}/splash.png"
+	[ -f "${SRC}/live-theme/theme.txt" ] \
+		&& cp -a "${SRC}/live-theme/theme.txt" "${_d}/live-theme/theme.txt"
+	[ -f "${SRC}/theme.cfg" ] && cp -a "${SRC}/theme.cfg" "${_d}/theme.cfg"
+	# Drop Debian testing hard-hat assets if live-build dropped them beside ours.
+	rm -f "${_d}/desktop-grub.png" "${_d}/debian-theme.png" 2>/dev/null || true
+}
+
+# lb binary cwd is the live-build project directory.
+find . -type f -name 'grub.cfg' 2>/dev/null | while read -r _cfg; do
+	_apply_dir "$(dirname "${_cfg}")"
+done
+
+# Common explicit paths (iso-hybrid / EFI variants).
+for _d in \
+	binary/boot/grub \
+	binary/EFI/boot/grub \
+	binary/EFI/debian/grub \
+	binary/efi/boot/grub; do
+	_apply_dir "${_d}"
+done
+
+exit 0

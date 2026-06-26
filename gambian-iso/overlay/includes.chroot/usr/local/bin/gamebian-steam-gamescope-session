@@ -21,6 +21,11 @@ if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
 	# shellcheck disable=SC1091
 	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
 fi
+if [ -r /usr/share/gamebian/gamebian-display-resolution.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-display-resolution.sh
+	gamebian_ensure_native_resolution 2>/dev/null || true
+fi
 
 export GAMEBIAN_GAMESCOPE_SESSION=1
 gamebian_kiosk_marker_set 2>/dev/null || true
