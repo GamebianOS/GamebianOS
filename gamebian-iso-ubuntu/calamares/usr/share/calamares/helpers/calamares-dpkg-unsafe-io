@@ -1,0 +1,14 @@
+#!/bin/sh
+
+CHROOT=$(mount | grep proc | grep calamares | awk '{print $3}' | sed -e "s#/proc##g")
+
+if [ "$1" = "-u" ]; then
+    rm -f "$CHROOT/etc/dpkg/dpkg.cfg.d/calamares-force-unsafe-io"
+    sync
+    exit 0
+fi
+
+mkdir -p "$CHROOT/etc/dpkg/dpkg.cfg.d"
+echo "force-unsafe-io" > "$CHROOT/etc/dpkg/dpkg.cfg.d/calamares-force-unsafe-io"
+
+exit 0

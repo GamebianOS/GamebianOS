@@ -1,0 +1,23 @@
+#!/bin/sh
+# Network tray for lxpanel: GTK status icon on installed disk; Qt nm-tray on live ISO.
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-openbox-session-env.sh
+	gamebian_openbox_session_env
+fi
+
+export XDG_CURRENT_DESKTOP=LXDE
+
+if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	exec /usr/bin/nm-tray "$@"
+fi
+
+if [ -x /usr/share/gamebian/gamebian-nm-status-icon.py ]; then
+	exec python3 /usr/share/gamebian/gamebian-nm-status-icon.py "$@"
+fi
+
+exec /usr/bin/nm-tray "$@"

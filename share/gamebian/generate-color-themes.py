@@ -2,6 +2,7 @@
 """Generate ~/.themes color variants for Gamebian skel overlay."""
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -15,12 +16,15 @@ PALETTE: dict[str, str] = {
     "purple": "#340E39",
 }
 
-SKEL_THEMES = Path(__file__).resolve().parents[2] / (
-    "gambian-iso/overlay/includes.chroot/etc/skel/.themes"
-)
-SKEL_ROFI = Path(__file__).resolve().parents[2] / (
-    "gambian-iso/overlay/includes.chroot/etc/skel/.local/share/rofi/themes"
-)
+def _iso_overlay() -> Path:
+    iso_root = os.environ.get("GAMEBIAN_ISO_ROOT")
+    if iso_root:
+        return Path(iso_root) / "overlay/includes.chroot"
+    return Path(__file__).resolve().parents[2] / "gamebian-iso/overlay/includes.chroot"
+
+
+SKEL_THEMES = _iso_overlay() / "etc/skel/.themes"
+SKEL_ROFI = _iso_overlay() / "etc/skel/.local/share/rofi/themes"
 
 
 def _hex_to_rgb(h: str) -> tuple[int, int, int]:

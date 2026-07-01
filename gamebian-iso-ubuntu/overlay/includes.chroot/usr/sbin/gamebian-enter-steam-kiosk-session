@@ -1,0 +1,285 @@
+#!/bin/sh
+# Leave Openbox and enter the fullscreen gamescope + Steam session (LightDM autologin).
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/enter-steam-kiosk.log"
+DISPLAY="${DISPLAY:-:0}"
+export DISPLAY
+export XAUTHORITY="${XAUTHORITY:-${HOME}/.Xauthority}"
+
+log() {
+	_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
+	_msg="[enter-steam-kiosk] $_ts $*"
+	echo "$_msg" >&2
+	mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+	echo "$_msg" >>"$LOG" 2>/dev/null || true
+}
+
+rm -f "${HOME}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
+rm -f "${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
+
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+
+_in_exclusive_kiosk() {
+	pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1
+}
+
+_on_openbox_desktop() {
+	pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1
+}
+
+_enable_lightdm_gamescope() {
+	if command -v gamebian_finish_steam_firstboot >/dev/null 2>&1; then
+		gamebian_finish_steam_firstboot 2>>"$LOG" && return 0
+	fi
+	if [ "$(id -u)" -eq 0 ]; then
+		/usr/sbin/gamebian-enable-steam-lightdm-session
+		return $?
+	fi
+	if command -v sudo >/dev/null 2>&1; then
+		sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null && return 0
+		sudo /usr/sbin/gamebian-enable-steam-lightdm-session 2>>"$LOG" && return 0
+		log "warning: sudo could not update boot preference (NOPASSWD?)"
+		return 1
+	fi
+	return 1
+}
+
+_stop_steam_gamescope() {
+	if pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 \
+		|| pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1; then
+		log "stopping prior steam/gamescope"
+		steam -shutdown 2>/dev/null || true
+		sleep 0.5
+		pkill -u "$(id -un)" -TERM -x gamescope 2>/dev/null || true
+		pkill -u "$(id -un)" -TERM -x steam 2>/dev/null || true
+		sleep 0.5
+		pkill -u "$(id -un)" -KILL -x gamescope 2>/dev/null || true
+		pkill -u "$(id -un)" -KILL -x steam 2>/dev/null || true
+	fi
+}
+
+_reenter_gamescope_same_login() {
+	log "re-enter gamescope on ${DISPLAY} (same LightDM login, no greeter)"
+	if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "gamescope already fullscreen — only stopping openbox if needed"
+		pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+		exit 0
+	fi
+
+	if gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+		gamebian_request_gamescope_kiosk 2>/dev/null || true
+		_i=0
+		while [ "${_i}" -lt 60 ]; do
+			if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+				|| ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+				log "gamescope-session took over (gamescope or openbox gone)"
+				gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
+				exit 0
+			fi
+			sleep 0.5
+			_i=$((_i + 1))
+		done
+		log "supervisor slow — nudging openbox --exit"
+		openbox --exit 2>/dev/null || true
+		exit 0
+	fi
+
+	_stop_steam_gamescope
+
+	log "no supervisor — launching gamescope on current X"
+	gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
+	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+	openbox --exit 2>/dev/null || pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+	sleep 0.5
+	if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+		gamebian_source_steam_gamescope_env
+	fi
+	export GAMEBIAN_GAMESCOPE_SESSION=1
+	export DESKTOP_SESSION=gamebian-steam-gamescope
+	export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
+	export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+	gamebian_kiosk_marker_set 2>/dev/null || true
+	exec /usr/local/bin/gamebian-steam-bigpicture
+}
+
+_end_session_for_gamescope() {
+	# Openbox-only LightDM login (first-boot / prefer-desktop): end session so autologin reruns.
+	if _on_openbox_desktop; then
+		log "openbox --exit (LightDM autologin → gamescope dispatcher)"
+		openbox --exit
+		exit 0
+	fi
+	if [ -n "${XDG_SESSION_ID:-}" ] && command -v loginctl >/dev/null 2>&1; then
+		log "terminating session ${XDG_SESSION_ID} for gamescope autologin"
+		loginctl terminate-session "${XDG_SESSION_ID}" 2>>"$LOG" && exit 0
+	fi
+	log "no openbox session to end"
+	exit 1
+}
+
+gamebian_find_steam_bin() {
+	for _c in /usr/games/steam /usr/bin/steam /usr/local/bin/steam; do
+		if [ -n "${_c}" ] && [ -x "${_c}" ]; then
+			printf '%s' "${_c}"
+			return 0
+		fi
+	done
+	if command -v steam >/dev/null 2>&1; then
+		command -v steam
+		return 0
+	fi
+	return 1
+}
+
+_steam_process_running() {
+	pgrep -u "$(id -un)" -x steam >/dev/null 2>&1 \
+		|| pgrep -u "$(id -un)" -x steam.sh >/dev/null 2>&1 \
+		|| pgrep -u "$(id -un)" -f '[s]team.sh ' >/dev/null 2>&1
+}
+
+_launch_steam_on_openbox() {
+	log "launching Steam on Openbox (stay logged in; sign-in if needed)"
+	unset GAMEBIAN_GAMESCOPE_SESSION
+	unset DESKTOP_SESSION
+	unset XDG_SESSION_DESKTOP
+	export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-LXDE}"
+	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+	export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+
+	if ! gamebian_steam_binary_present 2>/dev/null; then
+		log "Steam not installed — opening first-boot setup"
+		if command -v notify-send >/dev/null 2>&1; then
+			notify-send -a Gamebian -t 45000 "Installing Steam" \
+				"This may take several minutes. A setup terminal will open — watch it for apt progress. Steam can also run in the background while it downloads updates." \
+				2>/dev/null || true
+		fi
+		if command -v xfce4-terminal >/dev/null 2>&1 \
+			&& [ -x /usr/share/gamebian/steam-firstboot-terminal.sh ]; then
+			xfce4-terminal --title="Install Steam" \
+				-e 'bash /usr/share/gamebian/steam-firstboot-terminal.sh' >/dev/null 2>&1 &
+			return 0
+		fi
+		log "install steam (apt) or run steam-firstboot-terminal.sh"
+		return 1
+	fi
+
+	_steam_bin="$(gamebian_find_steam_bin)" || {
+		log "steam binary not found on PATH"
+		return 1
+	}
+
+	if [ -r /usr/share/gamebian/gamebian-fix-steam-share.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-fix-steam-share.sh
+		gamebian_fix_steam_share
+	fi
+
+	# Sign-in: plain Steam on the desktop (no gamescope). Caller runs only when not signed in.
+	log "Steam sign-in: starting desktop UI (${_steam_bin})"
+	if command -v notify-send >/dev/null 2>&1; then
+		notify-send -a Gamebian -t 45000 "Steam setup" \
+			"Starting Steam. First launch may take a while — it often updates in the background while you wait." \
+			2>/dev/null || true
+	fi
+	if _steam_process_running; then
+		log "Steam already running (likely -silent) — opening main window"
+	fi
+	"${_steam_bin}" >>"$LOG" 2>&1 &
+	return 0
+}
+
+log "start DISPLAY=$DISPLAY user=$(id -un)"
+
+if _in_exclusive_kiosk; then
+	log "already in gamescope kiosk"
+	exit 0
+fi
+
+# gamebian-steam-gamescope-session owns the login — menu must not spawn a second bigpicture.
+if gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+	if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "supervisor active + openbox — hand off to gamescope"
+		if ! _enable_lightdm_gamescope; then
+			log "warning: could not update LightDM steam preference"
+		fi
+		_reenter_gamescope_same_login
+	fi
+	if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1 \
+		&& ! pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		log "supervisor active — gamescope already running"
+		exit 0
+	fi
+	log "supervisor active — request gamescope kiosk"
+	gamebian_request_gamescope_kiosk 2>/dev/null || true
+	_i=0
+	while [ "${_i}" -lt 40 ]; do
+		if pgrep -u "$(id -un)" -x gamescope >/dev/null 2>&1; then
+			log "gamescope started by supervisor"
+			exit 0
+		fi
+		sleep 0.5
+		_i=$((_i + 1))
+	done
+	log "supervisor did not start gamescope in time"
+	exit 0
+fi
+
+# Openbox: sign in on the desktop first; end Openbox so LightDM autologins gamescope kiosk.
+if _on_openbox_desktop; then
+	if ! gamebian_steam_logged_in 2>/dev/null; then
+		_launch_steam_on_openbox
+		exit $?
+	fi
+	if ! _enable_lightdm_gamescope; then
+		log "could not enable Steam session for next boot (sudo /usr/sbin/gamebian-enable-steam-lightdm-session)"
+	fi
+	# After Switch to Desktop: same X session — never tear down LightDM login.
+	if [ -f "${HOME}/.config/gamebian/kiosk-openbox-handoff" ] \
+		|| gamebian_kiosk_openbox_handoff_active 2>/dev/null \
+		|| gamebian_gamescope_session_supervisor_running 2>/dev/null; then
+		_reenter_gamescope_same_login
+	fi
+	_end_session_for_gamescope
+fi
+
+_enable_lightdm_gamescope || true
+_stop_steam_gamescope
+
+if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+	gamebian_source_steam_gamescope_env
+fi
+
+export GAMEBIAN_GAMESCOPE_SESSION=1
+export DESKTOP_SESSION=gamebian-steam-gamescope
+export XDG_SESSION_DESKTOP=gamebian-steam-gamescope
+export XDG_CURRENT_DESKTOP=gamebian-steam-gamescope
+gamebian_kiosk_marker_set 2>/dev/null || true
+
+log "launching gamebian-steam-bigpicture on $DISPLAY (no openbox)"
+if /usr/local/bin/gamebian-steam-bigpicture; then
+	exit 0
+fi
+
+log "gamebian-steam-bigpicture failed — see ${HOME}/.cache/gamebian/steam-bigpicture.log"
+if command -v zenity >/dev/null 2>&1; then
+	zenity --error --title="Gamebian Steam" \
+		--text="Could not start Steam in gamescope.\nSee:\n  ${LOG}\n  ${HOME}/.cache/gamebian/steam-bigpicture.log" \
+		2>/dev/null || true
+fi
+exit 1

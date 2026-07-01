@@ -1,0 +1,14 @@
+# GTK theme: live ISO (gamebian) vs installed disk (gamebian-installed), if not already set.
+if [ -z "${GTK_THEME:-}" ]; then
+    if grep -qw boot=live /proc/cmdline 2>/dev/null; then
+        GTK_THEME=gamebian
+    else
+        GTK_THEME=gamebian-installed
+    fi
+    export GTK_THEME
+fi
+# Icon theme: Qt6 nm-tray needs Papirus-Dark on dark/blue panels (Papirus → white/missing squares).
+if [ -z "${GTK_ICON_THEME:-}" ]; then
+    GTK_ICON_THEME=Papirus-Dark
+    export GTK_ICON_THEME
+fi

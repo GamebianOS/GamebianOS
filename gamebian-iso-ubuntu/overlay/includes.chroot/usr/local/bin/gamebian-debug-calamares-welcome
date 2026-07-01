@@ -1,0 +1,106 @@
+#!/bin/bash
+# Mirror Calamares welcome.conf checks (storage, RAM, internet) for live-session debugging.
+set -u
+
+REQ_STORAGE_GIB=10
+REQ_RAM_GIB=1.5
+URLS=(
+	"https://www.ubuntu.com/"
+	"https://archive.ubuntu.com/"
+	"https://networkcheck.kde.org/"
+)
+
+pass() { printf '  OK   %s\n' "$*"; }
+fail() { printf '  FAIL %s\n' "$*"; }
+
+echo "=== GamebianUbuntu Calamares welcome checks ==="
+echo "welcome.conf: requiredStorage=${REQ_STORAGE_GIB} GiB requiredRam=${REQ_RAM_GIB} GiB"
+echo
+
+echo "== RAM =="
+if command -v free >/dev/null 2>&1; then
+	free -h | sed -n '1,2p'
+	_ram_gib="$(awk '/^Mem:/ {printf "%.2f", $2/1024/1024}' /proc/meminfo 2>/dev/null || echo 0)"
+	if awk -v r="${_ram_gib}" -v need="${REQ_RAM_GIB}" 'BEGIN { exit (r >= need) ? 0 : 1 }'; then
+		pass "RAM ${_ram_gib} GiB >= ${REQ_RAM_GIB} GiB"
+	else
+		fail "RAM ${_ram_gib} GiB < ${REQ_RAM_GIB} GiB"
+	fi
+else
+	fail "free(1) missing"
+fi
+echo
+
+echo "== Storage (needs a disk with >= ${REQ_STORAGE_GIB} GiB free/unpartitioned) =="
+if command -v lsblk >/dev/null 2>&1; then
+	lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL
+else
+	fail "lsblk missing"
+fi
+echo "Tip: VirtualBox needs a virtual hard disk (>= 15 GiB), not just the ISO."
+if command -v parted >/dev/null 2>&1; then
+	for _dev in /dev/sd? /dev/nvme?n? /dev/vd?; do
+		[ -b "$_dev" ] || continue
+		case "$_dev" in
+			*/loop*) continue ;;
+		esac
+		_free="$(parted -ms "$_dev" unit GiB print free 2>/dev/null | awk -F: '$1=="free" && $3+0 > max {max=$3} END {print max+0}')"
+		if [ -n "${_free:-}" ] && [ "${_free%%.*}" -ge "${REQ_STORAGE_GIB}" ] 2>/dev/null; then
+			pass "${_dev}: ${_free} GiB largest free region"
+		else
+			fail "${_dev}: largest free region ${_free:-unknown} GiB (need ${REQ_STORAGE_GIB})"
+		fi
+	done
+else
+	echo "(install parted for per-disk free-space summary)"
+fi
+echo
+
+echo "== Network / drivers =="
+if command -v ip >/dev/null 2>&1; then
+	ip -br link
+	ip -br addr
+else
+	fail "ip(8) missing"
+fi
+if command -v nmcli >/dev/null 2>&1; then
+	nmcli general status 2>/dev/null || true
+	nmcli dev status 2>/dev/null || true
+else
+	fail "nmcli missing (NetworkManager not installed?)"
+fi
+echo "--- ping ---"
+if ping -c2 -W3 8.8.8.8 >/dev/null 2>&1; then
+	pass "ping 8.8.8.8"
+else
+	fail "ping 8.8.8.8 (no default route or adapter down)"
+fi
+echo "--- DNS ---"
+if getent hosts archive.ubuntu.com >/dev/null 2>&1; then
+	pass "DNS resolves archive.ubuntu.com"
+else
+	fail "DNS lookup for archive.ubuntu.com"
+fi
+echo "--- Calamares internetCheckUrl (HTTPS GET) ---"
+for _url in "${URLS[@]}"; do
+	if curl -fsSI --connect-timeout 8 --max-time 15 "$_url" >/dev/null 2>&1; then
+		pass "$_url"
+	else
+		fail "$_url (curl exit $?)"
+	fi
+done
+echo "--- kernel / NIC ---"
+dmesg 2>/dev/null | grep -iE 'e1000|virtio_net|igb|realtek|r8169|firmware|link is up' | tail -15 || true
+echo
+
+echo "== Quick fixes to try =="
+echo "  sudo nmcli networking on"
+echo "  sudo nmcli device connect <iface>    # from ip -br link (e.g. enp0s3, eth0)"
+echo "  nm-online -w 30"
+echo "  Then restart Calamares: pkill calamares; calamares &"
+echo
+echo "VirtualBox: Settings → Storage → add SATA VDI >= 15 GiB; Network → NAT + Intel PRO/1000."
+echo
+echo "Ubuntu NM bug: wired NICs may show 'unmanaged' (wifi-only policy). Fix on live ISO:"
+echo "  sudo rm /usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf"
+echo "  sudo systemctl restart NetworkManager && sleep 2 && sudo nmcli dev connect enp0s3"

@@ -1,0 +1,35 @@
+#!/bin/sh
+# Steam "Switch to Desktop": set handoff flag and stop gamescope kiosk (return immediately).
+# Steam blocks on steamos-session-select until this script exits — never steam -shutdown sync.
+# Openbox is started by gamebian-steam-bigpicture via gamebian_handoff_to_openbox_desktop.
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+export PATH
+
+LOG="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/switch-to-desktop.log"
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+
+log() {
+	_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
+	printf '%s %s\n' "$_ts" "$*" >>"$LOG" 2>/dev/null || true
+}
+
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
+
+log "switch-to-desktop: request handoff (boot session unchanged)"
+
+gamebian_request_switch_to_openbox
+gamebian_kill_steam_kiosk_tree
+
+(
+	sleep 0.2
+	gamebian_kill_steam_kiosk_tree
+) &
+
+_gs=$(pgrep -u "$(id -un)" -x gamescope 2>/dev/null | head -1 || true)
+_st=$(pgrep -u "$(id -un)" -x steam 2>/dev/null | head -1 || true)
+log "done flag=set gamescope=${_gs:-none} steam=${_st:-none} (bigpicture will exec openbox)"
+exit 0

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Launch Calamares with privileges required for partition/mount/unpackfs jobs.
+# Based on calamares-settings-debian calamares-install-debian.
+
+# Stale live-build fstab can confuse the partition module.
+if [ -f /etc/fstab ] && [ ! -f /etc/fstab.orig.calamares ]; then
+	sudo mv /etc/fstab /etc/fstab.orig.calamares
+fi
+
+export QT_AUTO_SCREEN_SCALE_FACTOR=1
+
+if command -v xhost >/dev/null 2>&1; then
+	xhost +si:localuser:root 2>/dev/null || true
+fi
+
+if command -v pkexec >/dev/null 2>&1; then
+	pkexec calamares "$@"
+else
+	sudo -E calamares "$@"
+fi
+_status=$?
+
+if command -v xhost >/dev/null 2>&1; then
+	xhost -si:localuser:root 2>/dev/null || true
+fi
+
+if [ -f /etc/fstab.orig.calamares ]; then
+	sudo mv /etc/fstab.orig.calamares /etc/fstab
+fi
+
+exit "$_status"

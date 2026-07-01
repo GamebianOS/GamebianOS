@@ -1,0 +1,8 @@
+#!/bin/sh
+# Live ISO squashfs: enable universe + multiverse for steam, gamescope, libretro.
+set -e
+if [ -f /usr/share/gamebian/ensure-apt-gaming-repos.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-gaming-repos.sh
+	ensure_apt_gaming_repos
+fi

@@ -1,0 +1,40 @@
+# Gamebian GTK2 — red
+
+style "red-default" {
+  fg[NORMAL]       = "#ffffff"
+  fg[PRELIGHT]     = "#ffffff"
+  fg[ACTIVE]       = "#ffffff"
+  fg[SELECTED]     = "#ffffff"
+  fg[INSENSITIVE]  = "#c97f84"
+
+  bg[NORMAL]       = "#9e1720"
+  bg[PRELIGHT]     = "#8b141c"
+  bg[ACTIVE]       = "#a52931"
+  bg[SELECTED]     = "#a52931"
+  bg[INSENSITIVE]  = "#7b1118"
+
+  base[NORMAL]     = "#1e1e28"
+  base[PRELIGHT]   = "#1e1e28"
+  base[ACTIVE]     = "#a52931"
+  base[SELECTED]   = "#a52931"
+  base[INSENSITIVE]= "#7b1118"
+
+  text[NORMAL]     = "#ebebeb"
+  text[PRELIGHT]   = "#ebebeb"
+  text[ACTIVE]     = "#ffffff"
+  text[SELECTED]   = "#ffffff"
+  text[INSENSITIVE]= "#c97f84"
+
+  font_name = "Sans 9"
+}
+
+class "GtkWidget" style "red-default"
+
+style "red-notebook" = "red-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "red-notebook"
+
+gtk-icon-theme-name = "Papirus-Dark"

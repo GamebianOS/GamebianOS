@@ -1,0 +1,7 @@
+#!/bin/sh
+# First boot on live ISO: ensure host keys exist before ssh.socket accepts connections.
+set -e
+if [ ! -f /etc/ssh/ssh_host_ed25519_key ] && [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
+	/usr/bin/ssh-keygen -A
+fi
+/usr/sbin/sshd -t

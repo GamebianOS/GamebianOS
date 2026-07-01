@@ -1,0 +1,40 @@
+# Gamebian GTK2 — purple
+
+style "purple-default" {
+  fg[NORMAL]       = "#ffffff"
+  fg[PRELIGHT]     = "#ffffff"
+  fg[ACTIVE]       = "#ffffff"
+  fg[SELECTED]     = "#ffffff"
+  fg[INSENSITIVE]  = "#8f7a92"
+
+  bg[NORMAL]       = "#340e39"
+  bg[PRELIGHT]     = "#2d0c32"
+  bg[ACTIVE]       = "#442148"
+  bg[SELECTED]     = "#442148"
+  bg[INSENSITIVE]  = "#280a2c"
+
+  base[NORMAL]     = "#1e1e28"
+  base[PRELIGHT]   = "#1e1e28"
+  base[ACTIVE]     = "#442148"
+  base[SELECTED]   = "#442148"
+  base[INSENSITIVE]= "#280a2c"
+
+  text[NORMAL]     = "#ebebeb"
+  text[PRELIGHT]   = "#ebebeb"
+  text[ACTIVE]     = "#ffffff"
+  text[SELECTED]   = "#ffffff"
+  text[INSENSITIVE]= "#8f7a92"
+
+  font_name = "Sans 9"
+}
+
+class "GtkWidget" style "purple-default"
+
+style "purple-notebook" = "purple-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "purple-notebook"
+
+gtk-icon-theme-name = "Papirus-Dark"

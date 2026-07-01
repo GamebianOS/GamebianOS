@@ -1,8 +1,10 @@
-# GamebianOS
+# GamebianOS / GamebianUbuntu
 
 **GamebianOS** is Debian built for one job: install once, then boot like a console into **Steam Big Picture** inside **gamescope**. Same packages and mirrors as Debian; lightweight Openbox when you need a real desktop.
 
-Think of it as a **game console image** on Debian rather than full desktop sprawl: sign in once, drive Steam with a controller, and keep a normal Openbox session when you need it.
+**GamebianUbuntu** is the Ubuntu-based sibling: same Openbox + Steam + gamescope console experience, built on **Ubuntu 26.04 LTS (Resolute Raccoon)** instead of Debian trixie.
+
+Think of either image as a **game console appliance** rather than full desktop sprawl: install once with Calamares, sign in to Steam on the desktop, reboot — then autologin boots **Steam Big Picture** inside **gamescope**. Desktop mode stays available when you need it.
 
 It is still **Debian underneath** — same packages, mirrors, and tooling you already know — with a lightweight Openbox base, Calamares, and glue for LightDM, Steam, and gamescope.
 
@@ -30,23 +32,66 @@ Optional pieces include **gamebian-web** (`:8844`) for remote ROM/store setup an
 
 ## Quick start (build the ISO)
 
+**Debian (GamebianOS):**
+
 ```bash
-cd Build/gambian-iso
+cd Build/gamebian-iso
 ./setup.sh
 ./build.sh    # or: sudo lb build from GAMEBIANOS_BUILD_ROOT
 ```
 
 Default build output: `/home/khinds/gamebianos-build-iso` (override with `GAMEBIANOS_BUILD_ROOT`).
 
+**Ubuntu (GamebianUbuntu):**
+
+```bash
+cd Build/gamebian-iso-ubuntu
+./setup.sh
+./build.sh    # sudo lb build from GAMEBIANUBUNTU_BUILD_ROOT
+```
+
+Default build output: `/home/khinds/gamebian-ubuntu-build-iso` (override with `GAMEBIANUBUNTU_BUILD_ROOT`).
+
+Build host for Ubuntu: Ubuntu 26.04 (resolute) recommended. On Debian, install `ubuntu-keyring` for debootstrap.
+
+Branding PNGs for both profiles: edit `Build/images/` then re-run `./setup.sh` in either profile directory.
+
+Distro-specific naming, live-build options, and `/etc/gamebian/distro.conf` values live in **`Build/metadata/`** (`debian.env` / `ubuntu.env`). Both `setup.sh` scripts source their profile env and stage the matching `*.distro.conf` onto the ISO.
+
+## Debian vs Ubuntu
+
+Canonical diff table (build-time keys, feature flags, runtime `distro.conf`): **`metadata/README.md`**.
+
+| | GamebianOS (Debian) | GamebianUbuntu |
+|---|---|---|
+| Base | Debian trixie | Ubuntu 26.04 LTS resolute |
+| Profile dir | `gamebian-iso/` | `gamebian-iso-ubuntu/` |
+| Build root env | `GAMEBIANOS_BUILD_ROOT` | `GAMEBIANUBUNTU_BUILD_ROOT` |
+| Steam package | `steam-installer` | `steam` (multiverse) |
+| gamescope | Source build on ISO | **apt** (source fallback) |
+| APT gaming repos | contrib + non-free | universe + multiverse |
+| RetroArch list | `debian-retroarch.list` | `ubuntu-retroarch.list` |
+| Calamares installer | `calamares-install-debian` | `calamares-install-gamebian` |
+
+GamebianUbuntu was forked from GamebianOS; Debian-specific paths were replaced for Ubuntu resolute. Overlay hooks, Calamares modules, and some session scripts still differ per profile — see `metadata/README.md` (still profile-specific).
+
 ## Repository layout
 
 | Path | Role |
 |------|------|
-| `Build/gambian-iso/` | Live-build profile: `overlay/`, `hooks/`, package lists |
-| `Build/gambian-iso/setup.sh` | Merge overlay into `GAMEBIANOS_BUILD_ROOT`, Calamares, themes |
-| `Build/gambian-iso/build.sh` | Run `lb build` |
-| `Build/share/calamares-gamebian/` | Calamares modules and branding |
-| `Build/share/gamebian/` | Controller menu, `ensure-apt-contrib-nonfree.sh` (canonical APT helper) |
+| `Build/metadata/` | Profile env (`debian.env`, `ubuntu.env`) and runtime `*.distro.conf` — see `Build/metadata/README.md` |
+| `Build/images/` | Shared branding PNGs (Calamares, live, installed, GRUB, icons) |
+| `Build/gamebian-iso/` | Debian trixie live-build profile: `overlay/`, `hooks/`, package lists |
+| `Build/gamebian-iso-ubuntu/` | Ubuntu resolute live-build profile |
+| `Build/gamebian-iso/setup.sh` | Source `debian.env`, merge overlay into `GAMEBIANOS_BUILD_ROOT`, stage `/etc/gamebian/distro.conf` |
+| `Build/gamebian-iso/build.sh` | Run `lb build` (Debian; build root from `debian.env`) |
+| `Build/gamebian-iso-ubuntu/setup.sh` | Source `ubuntu.env`, merge overlay into `GAMEBIANUBUNTU_BUILD_ROOT`, stage `/etc/gamebian/distro.conf` |
+| `Build/gamebian-iso-ubuntu/build.sh` | Run `lb build` (Ubuntu; build root from `ubuntu.env`) |
+| `Build/gamebian-iso/calamares/` | Debian Calamares modules, branding, installer helpers |
+| `Build/gamebian-iso-ubuntu/calamares/` | Ubuntu Calamares install pipeline (partition, mount, unpackfs, …) |
+| `Build/share/gamebian/` | Controller menu (shared) |
+| `Build/gamebian-iso/ensure-apt-contrib-nonfree.sh` | Debian APT contrib/non-free helper |
+| `Build/gamebian-iso-ubuntu/ensure-apt-gaming-repos.sh` | Ubuntu APT universe/multiverse helper |
 | `Packages/gamebian-web/` | Web UI source (staged on ISO, installed by Calamares) |
 | `scripts/gamebian-sync-installed.sh` | Push overlay changes to an installed system for testing |
 
@@ -56,9 +101,9 @@ This is the full story of how **GamebianOS** gets from source tree to a gaming a
 
 ### Step 0 — Build the hybrid ISO
 
-From `Build/gambian-iso/`:
+From `Build/gamebian-iso/`:
 
-1. **`./setup.sh`** — Runs `lb config` for **Debian trixie**, merges `overlay/` (package lists, hooks, `includes.chroot` files), copies Calamares branding/modules from `Build/share/calamares-gamebian/`, stages `Packages/gamebian-web` at `/usr/src/gamebian-web` on the squashfs, generates color themes, and resets the live-build chroot.
+1. **`./setup.sh`** — Runs `lb config` for **Debian trixie**, merges `overlay/` (package lists, hooks, `includes.chroot` files), copies Calamares branding/modules from `gamebian-iso/calamares/`, stages `Packages/gamebian-web` at `/usr/src/gamebian-web` on the squashfs, generates color themes, and resets the live-build chroot.
 2. **`./build.sh`** — Runs `sudo lb build` in `GAMEBIANOS_BUILD_ROOT` (default `/home/khinds/gamebianos-build-iso`). Output is a **hybrid ISO** you can dd to USB or boot in a VM.
 3. **Hook 997** (during `lb build`, needs network) — Builds **gamescope** from GitHub, installs libretro cores from `debian-retroarch.list`, and optionally builds N64 / Dolphin libretro cores. Failures are logged but do not fail the image; missing gamescope sets `/etc/gamebian/steam-without-gamescope`.
 
@@ -176,7 +221,7 @@ Hook order (lexicographic): **992** grub branding → **993** bluetooth → **99
 Hook **997** logs warnings if cores are missing but does not fail the image build.
 
 ```bash
-cd Build/gambian-iso
+cd Build/gamebian-iso
 ./setup.sh
 ./build.sh    # or: sudo lb build from GAMEBIANOS_BUILD_ROOT
 ```
@@ -185,7 +230,7 @@ Default build output: `/home/khinds/gamebianos-build-iso` (override with `GAMEBI
 
 ### ISO profile layout
 
-This directory is the **live-build profile** (`overlay/`, `hooks/`, package lists). Calamares modules live in [`../share/calamares-gamebian/`](../share/calamares-gamebian/).
+This directory is the **live-build profile** (`overlay/`, `hooks/`, package lists). Calamares modules live in [`calamares/`](calamares/) (Debian) or [`../gamebian-iso-ubuntu/calamares/`](../gamebian-iso-ubuntu/calamares/) (Ubuntu).
 
 **Included on the image (high level):**
 
@@ -252,7 +297,7 @@ flowchart TD
 | Live autologin user | `etc/lightdm/lightdm.conf.d/50-gamebian-live-autologin.conf` | `autologin-user=live` (deleted on disk install) |
 | Session dispatcher | `usr/local/bin/gamebian-autologin-session` | If `boot=live` in cmdline → always `openbox-session` |
 | Desktop autostart | `etc/skel/.config/openbox/autostart` | lxpanel, NM, notifyd; starts **Calamares** when live |
-| Web install (target only) | `../share/calamares-gamebian/usr/local/sbin/gamebian-web-install` | APT + pip install `gamebian-web` in installed chroot |
+| Web install (target only) | `calamares/usr/local/sbin/gamebian-web-install` | APT + pip install `gamebian-web` in installed chroot |
 | APT sources helper | `usr/local/sbin/gamebian-ensure-apt-sources` | Enables contrib/non-free before Calamares apt steps |
 
 `steam-installer` is in the squashfs (`overlay/package-lists/openbox.list.chroot`). First-boot terminal logic is **skipped on live** (every relevant script checks `grep boot=live /proc/cmdline`).
@@ -400,7 +445,7 @@ Shared helpers: `gamebian-steam-ready.sh`, `gamebian-steam-gamescope-env.sh`, `g
 | `gamebian-session-log.sh` | Append to `~/.cache/gamebian/lightdm-login.log` |
 | `gamebian-lightdm-user.sh` | Resolve autologin user home (for root enable scripts) |
 
-`ensure-apt-contrib-nonfree.sh` lives in `Build/share/gamebian/` (copied onto the ISO by `setup.sh`).
+`ensure-apt-contrib-nonfree.sh` lives in `Build/gamebian-iso/` (copied onto the ISO by `setup.sh`).
 
 #### systemd / udev
 
@@ -588,7 +633,7 @@ Sourced by session scripts, Openbox autostart, and installers — not usually ru
 
 | Path | Description |
 |------|-------------|
-| `/usr/share/gamebian/ensure-apt-contrib-nonfree.sh` | Add **i386**; enable **contrib/non-free** (canonical: `Build/share/gamebian/`). |
+| `/usr/share/gamebian/ensure-apt-contrib-nonfree.sh` | Add **i386**; enable **contrib/non-free** (canonical: `Build/gamebian-iso/`). |
 | `/usr/share/gamebian/gamebian-apt-unmix-sid.sh` | Stash sid pins/sources; align `libgpg-error0` amd64/i386 for Steam. |
 | `/usr/share/gamebian/gamebian-fix-steam-share.sh` | Symlink `~/.local/share/Steam` → `~/.steam/debian-installation` (overlay only; not shipped by gamebian-web pip). |
 | `/usr/share/gamebian/gamebian-lightdm-user.sh` | Resolve autologin username and home (root enable-* scripts). |
@@ -764,6 +809,14 @@ Production-ready when **B1–B4**, **C1–C3**, **D1–D3** (including **D1b**),
 
 ---
 
+## Related documentation
+
+- `metadata/README.md` — canonical Debian vs Ubuntu key reference (`*.env`, `*.distro.conf`)
+- `images/README.md` — branding PNG layout
+- `../../Docs/` — retro platforms, sync scripts (updated for Ubuntu where noted)
+
+---
+
 ## In one sentence
 
-**Install Debian once with Calamares, sign in to Steam on the desktop, reboot — then GamebianOS boots like a Steam Deck inside gamescope.**
+**Install once with Calamares, sign in to Steam on the desktop, reboot — then GamebianOS or GamebianUbuntu boots like a Steam Deck inside gamescope.**

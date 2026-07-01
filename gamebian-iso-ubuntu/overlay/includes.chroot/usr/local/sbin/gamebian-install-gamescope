@@ -1,0 +1,167 @@
+#!/bin/sh
+# Ubuntu resolute: install gamescope from apt (fallback: build from source).
+# ISO hook 997 and Calamares sshprep call this. On failure: steam-without-gamescope.
+set +e
+
+export DEBIAN_FRONTEND=noninteractive
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec sudo "$0" "$@"
+fi
+
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if ! command -v gamebian_gamescope_binary_works >/dev/null 2>&1; then
+	gamebian_gamescope_binary_works() {
+		[ -f /etc/gamebian/steam-without-gamescope ] && return 1
+		command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1 && return 0
+		[ -x /usr/games/gamescope ] && /usr/games/gamescope --help >/dev/null 2>&1
+	}
+fi
+
+_gamebian_link_gamescope_bins() {
+	for _b in /usr/local/bin/gamescope /usr/bin/gamescope /usr/games/gamescope; do
+		[ -x "${_b}" ] || continue
+		[ -e /usr/bin/gamescope ] || ln -sf "${_b}" /usr/bin/gamescope 2>/dev/null || true
+		[ -e /usr/games/gamescope ] || ln -sf "${_b}" /usr/games/gamescope 2>/dev/null || true
+		return 0
+	done
+	return 1
+}
+
+_gamebian_steam_without_gamescope() {
+	echo ""
+	echo "gamescope unavailable — enabling Steam session WITHOUT gamescope (fullscreen Steam on X)." >&2
+	mkdir -p /etc/gamebian
+	: > /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_home="$(gamebian_lightdm_user_home)" || _home=""
+		if [ -n "${_home}" ]; then
+			mkdir -p "${_home}/.config/gamebian"
+			: > "${_home}/.config/gamebian/steam-without-gamescope"
+			_u="$(gamebian_lightdm_autologin_user)"
+			[ -n "${_u}" ] && chown "${_u}:${_u}" "${_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+		fi
+	fi
+	echo "Steam LightDM session will still work. Reboot and log in as Steam."
+}
+
+_gamebian_clear_gamescope_fallback_markers() {
+	rm -f /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_home="$(gamebian_lightdm_user_home)" || _home=""
+		_u="$(gamebian_lightdm_autologin_user)" || _u=""
+		if [ -n "${_home}" ]; then
+			rm -f "${_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+			[ -n "${_u}" ] && chown "${_u}:${_u}" "${_home}/.config/gamebian" 2>/dev/null || true
+		fi
+	fi
+}
+
+if gamebian_gamescope_binary_works 2>/dev/null; then
+	_gamebian_clear_gamescope_fallback_markers
+	echo "gamescope OK: $(command -v gamescope 2>/dev/null || echo /usr/games/gamescope)"
+	exit 0
+fi
+
+if [ -r /usr/share/gamebian/ensure-apt-gaming-repos.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-gaming-repos.sh
+	ensure_apt_gaming_repos
+fi
+
+apt-get update -qq 2>/dev/null || apt-get update || {
+	echo "warning: apt-get update failed (need network)" >&2
+	_gamebian_steam_without_gamescope
+	exit 0
+}
+
+_suite="${GAMEBIAN_SUITE:-resolute}"
+if apt-cache policy gamescope 2>/dev/null | grep -q "${_suite}\|archive.ubuntu.com"; then
+	echo "Trying gamescope from Ubuntu apt…"
+	if apt-get install -y gamescope; then
+		_gamebian_link_gamescope_bins
+		if gamebian_gamescope_binary_works 2>/dev/null; then
+			_gamebian_clear_gamescope_fallback_markers
+			echo "OK (apt): $(command -v gamescope)"
+			exit 0
+		fi
+	fi
+fi
+
+# Fallback: source build (same as upstream Gamebian trixie path).
+_gamebian_gamescope_build_deps() {
+	echo "Installing gamescope build dependencies…"
+	apt-get build-dep -y gamescope 2>/dev/null || true
+	apt-get install -y --no-install-recommends \
+		build-essential git meson ninja-build cmake pkg-config python3 \
+		libdrm-dev libvulkan-dev libwayland-dev libx11-dev libsdl2-dev \
+		libpipewire-0.3-dev libliftoff-dev xwayland \
+		2>/dev/null || apt-get install -y build-essential git meson ninja-build cmake pkg-config
+}
+
+_gamebian_gamescope_build_from_source() {
+	_ref="${GAMEBIAN_GAMESCOPE_GIT_REF:-3.16.22}"
+	_src="${GAMEBIAN_GAMESCOPE_SRC_DIR:-/var/tmp/gamebian-gamescope-src}"
+	_build="${GAMEBIAN_GAMESCOPE_BUILD_DIR:-/var/tmp/gamebian-gamescope-build}"
+
+	rm -rf "${_src}" "${_build}"
+	mkdir -p "$(dirname "${_src}")"
+
+	if ! command -v git >/dev/null 2>&1; then
+		apt-get install -y git || return 1
+	fi
+
+	echo "Cloning https://github.com/ValveSoftware/gamescope (ref=${_ref})…"
+	git clone https://github.com/ValveSoftware/gamescope.git "${_src}" || return 1
+	(
+		cd "${_src}" || exit 1
+		git checkout "${_ref}" 2>/dev/null \
+			|| git checkout "tags/${_ref}" 2>/dev/null \
+			|| echo "warning: using default branch (ref ${_ref} not found)" >&2
+		git submodule update --init --recursive
+		meson subprojects download 2>/dev/null || true
+	) || return 1
+
+	(
+		cd "${_src}" || exit 1
+		rm -rf "${_build}"
+		_meson_flags="--prefix=/usr -Dbuildtype=release -Dforce_fallback_for=wlroots,libliftoff,vkroots"
+		if ! meson setup "${_build}" ${_meson_flags}; then
+			meson setup "${_build}" ${_meson_flags} -Dwlroots:xwayland=disabled || exit 1
+		fi
+		ninja -C "${_build}" || exit 1
+		ninja -C "${_build}" install || exit 1
+	) || return 1
+
+	ldconfig 2>/dev/null || true
+	_gamebian_link_gamescope_bins
+	return 0
+}
+
+echo "=== gamebian-install-gamescope (Ubuntu: apt then source fallback) ==="
+_gamebian_gamescope_build_deps || echo "warning: some build-deps may be missing" >&2
+
+if _gamebian_gamescope_build_from_source; then
+	if gamebian_gamescope_binary_works 2>/dev/null; then
+		_gamebian_clear_gamescope_fallback_markers
+		case "${GAMEBIAN_GAMESCOPE_KEEP_SRC:-0}" in
+			0|no|false|NO|FALSE) rm -rf "${GAMEBIAN_GAMESCOPE_SRC_DIR:-/var/tmp/gamebian-gamescope-src}" \
+				"${GAMEBIAN_GAMESCOPE_BUILD_DIR:-/var/tmp/gamebian-gamescope-build}" 2>/dev/null || true ;;
+		esac
+		echo "OK (source): $(command -v gamescope 2>/dev/null || echo /usr/local/bin/gamescope)"
+		gamescope --help 2>&1 | head -n 1
+		exit 0
+	fi
+fi
+
+echo "gamescope install failed." >&2
+_gamebian_steam_without_gamescope
+exit 0

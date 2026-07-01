@@ -1,9 +1,0 @@
-#!/bin/sh
-# Re-apply USB wakeup before suspend (some drivers reset wakeup flags).
-case "${1:-}" in
-	pre)
-		/usr/libexec/gamebian/enable-usb-wakeup-all
-		;;
-esac
-
-exit 0

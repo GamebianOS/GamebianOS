@@ -1,0 +1,40 @@
+# Gamebian GTK2 — green
+
+style "green-default" {
+  fg[NORMAL]       = "#ffffff"
+  fg[PRELIGHT]     = "#ffffff"
+  fg[ACTIVE]       = "#ffffff"
+  fg[SELECTED]     = "#ffffff"
+  fg[INSENSITIVE]  = "#789882"
+
+  bg[NORMAL]       = "#0b441d"
+  bg[PRELIGHT]     = "#093b19"
+  bg[ACTIVE]       = "#1e522f"
+  bg[SELECTED]     = "#1e522f"
+  bg[INSENSITIVE]  = "#083516"
+
+  base[NORMAL]     = "#1e1e28"
+  base[PRELIGHT]   = "#1e1e28"
+  base[ACTIVE]     = "#1e522f"
+  base[SELECTED]   = "#1e522f"
+  base[INSENSITIVE]= "#083516"
+
+  text[NORMAL]     = "#ebebeb"
+  text[PRELIGHT]   = "#ebebeb"
+  text[ACTIVE]     = "#ffffff"
+  text[SELECTED]   = "#ffffff"
+  text[INSENSITIVE]= "#789882"
+
+  font_name = "Sans 9"
+}
+
+class "GtkWidget" style "green-default"
+
+style "green-notebook" = "green-default" {
+  GtkNotebook::tab-hborder = 12
+  GtkNotebook::tab-vborder = 6
+}
+
+class "GtkNotebook" style "green-notebook"
+
+gtk-icon-theme-name = "Papirus-Dark"

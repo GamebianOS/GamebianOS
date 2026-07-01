@@ -1,0 +1,82 @@
+#!/bin/sh
+# Repair Steam/gamescope boot + show what went wrong (run on installed Gamebian).
+set -eu
+
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin${PATH:+:$PATH}"
+
+echo "=== gamebian-fix-steam-boot ==="
+
+if [ "$(id -u)" -ne 0 ]; then
+	if command -v sudo >/dev/null 2>&1; then
+		exec sudo -E "$0" "$@"
+	fi
+	echo "Run as root or with sudo." >&2
+	exit 1
+fi
+
+/usr/sbin/gamebian-enable-steam-lightdm-session
+
+if command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1; then
+	rm -f /etc/gamebian/steam-without-gamescope
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_fb_home="$(gamebian_lightdm_user_home)" || _fb_home=""
+		[ -n "${_fb_home}" ] && rm -f "${_fb_home}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
+	fi
+else
+	echo ""
+	echo "gamescope is missing or broken on this system."
+	echo "  Calamares needs network during install. Check: /var/log/gamebian-install-gamescope.log"
+	echo "  Install now: sudo gamebian-install-gamescope"
+fi
+if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-lightdm-user.sh
+	_u="$(gamebian_lightdm_autologin_user)"
+	_home="$(gamebian_lightdm_user_home)" || _home=""
+	if [ -n "${_home}" ] && [ -n "${_u}" ]; then
+		mkdir -p "${_home}/.config/gamebian" "${_home}/.config"
+		_steam_installed=0
+		_steam_signed_in=0
+		if [ -f "${_home}/.steam/debian-installation/ubuntu12_32/steam" ] \
+			|| [ -f "${_home}/.local/share/Steam/ubuntu12_32/steam" ] \
+			|| [ -x "${_home}/.steam/debian-installation/steam.sh" ] \
+			|| [ -x "${_home}/.local/share/Steam/steam.sh" ] \
+			|| command -v steam >/dev/null 2>&1; then
+			_steam_installed=1
+		fi
+		if [ -f "${_home}/.steam/debian-installation/config/loginusers.vdf" ] \
+			|| [ -f "${_home}/.local/share/Steam/config/loginusers.vdf" ]; then
+			_steam_signed_in=1
+		fi
+		if [ "${_steam_installed}" -eq 1 ] && [ "${_steam_signed_in}" -eq 1 ]; then
+			: >"${_home}/.config/gamebian-firstboot-steam.done"
+			touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
+			chown "${_u}:${_u}" "${_home}/.config/gamebian-firstboot-steam.done" \
+				"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
+			echo "Marked Steam ready for user ${_u} (signed in)"
+		else
+			rm -f "${_home}/.config/gamebian-firstboot-steam.done" \
+				"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
+			if [ "${_steam_installed}" -eq 0 ]; then
+				echo "User ${_u}: Steam is not fully installed — autologin stays on Openbox"
+			else
+				echo "User ${_u} is not signed in to Steam yet — autologin stays on Openbox"
+			fi
+			echo "  Sign in via the Steam setup terminal, then reboot."
+		fi
+	fi
+fi
+
+echo ""
+echo "gamescope: $(command -v gamescope 2>/dev/null || echo NOT INSTALLED)"
+if ! command -v gamescope >/dev/null 2>&1; then
+	echo "Install gamescope (Ubuntu universe — required for Steam session):"
+	echo "  sudo gamebian-install-gamescope"
+fi
+echo ""
+echo "LightDM session config:"
+grep -hE '^(autologin-session|user-session|autologin-user)=' /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | sort || true
+echo ""
+echo "Reboot after Steam is installed and signed in. Autologin uses gamescope only then."

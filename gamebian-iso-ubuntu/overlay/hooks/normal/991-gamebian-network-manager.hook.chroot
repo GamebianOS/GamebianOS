@@ -1,0 +1,33 @@
+#!/bin/sh
+# Ubuntu NetworkManager marks wired NICs unmanaged (wifi-only desktop policy).
+# Gamebian live/install needs wired DHCP (VirtualBox NAT, Ethernet, etc.).
+set -e
+rm -f /usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf
+
+# Autoconnect wired DHCP on live boot (VirtualBox enp0s3, etc.).
+mkdir -p /etc/NetworkManager/system-connections
+cat > /etc/NetworkManager/system-connections/gamebian-wired-autoconnect.nmconnection <<'EOF'
+[connection]
+id=Gamebian wired autoconnect
+uuid=7c4e9a20-3b1d-4f6e-9c8a-gamebianwired01
+type=ethernet
+autoconnect=true
+autoconnect-priority=100
+
+[ethernet]
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+addr-gen-mode=default
+EOF
+chmod 600 /etc/NetworkManager/system-connections/gamebian-wired-autoconnect.nmconnection
+
+mkdir -p /etc/NetworkManager/conf.d
+cat > /etc/NetworkManager/conf.d/99-gamebian-dns.conf <<'EOF'
+[main]
+dns=systemd-resolved
+systemd-resolved=true
+EOF

@@ -1,0 +1,145 @@
+#!/bin/sh
+# LightDM Steam session: gamescope + Steam only (no Openbox). Do not fall back when user chose Steam.
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
+# LightDM sets this before Xsession runs (save before we override).
+GAMEBIAN_LIGHTDM_SESSION="${DESKTOP_SESSION:-}"
+[ -z "${GAMEBIAN_LIGHTDM_SESSION}" ] && GAMEBIAN_LIGHTDM_SESSION="${GDMSESSION:-}"
+
+if [ -r /usr/share/gamebian/gamebian-session-log.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-session-log.sh
+	gamebian_session_log "gamebian-steam-gamescope" "ldm=${GAMEBIAN_LIGHTDM_SESSION} $*"
+fi
+
+if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-ready.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-steam-kiosk-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-kiosk-env.sh
+fi
+if [ -r /usr/share/gamebian/gamebian-display-resolution.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-display-resolution.sh
+	gamebian_ensure_native_resolution 2>/dev/null || true
+fi
+
+export GAMEBIAN_GAMESCOPE_SESSION=1
+gamebian_kiosk_marker_set 2>/dev/null || true
+export DESKTOP_SESSION=gamebian-steam
+export XDG_SESSION_DESKTOP=gamebian-steam
+export XDG_CURRENT_DESKTOP=gamebian-steam
+
+_uid="$(id -u)"
+if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "${XDG_RUNTIME_DIR}" ] || [ ! -w "${XDG_RUNTIME_DIR}" ]; then
+	export XDG_RUNTIME_DIR="/run/user/${_uid}"
+	mkdir -p "${XDG_RUNTIME_DIR}" 2>/dev/null || true
+	chmod 700 "${XDG_RUNTIME_DIR}" 2>/dev/null || true
+fi
+
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+	if [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+		export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+	elif [ -x /usr/bin/dbus-launch ]; then
+		# shellcheck disable=SC2046
+		eval $(/usr/bin/dbus-launch --sh-syntax --exit-with-session) 2>/dev/null || true
+	fi
+fi
+
+POLKIT_AGENT=""
+for _p in /usr/libexec/polkit-gnome-authentication-agent-1 \
+	/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 \
+	/usr/libexec/polkit-mate-authentication-agent-1 \
+	/usr/bin/lxpolkit; do
+	if [ -x "${_p}" ]; then
+		POLKIT_AGENT="${_p}"
+		break
+	fi
+done
+if [ -n "${POLKIT_AGENT}" ]; then
+	"${POLKIT_AGENT}" >/dev/null 2>&1 &
+fi
+
+if [ -r /usr/share/gamebian/gamebian-steam-gamescope-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-steam-gamescope-env.sh
+	gamebian_source_steam_gamescope_env
+fi
+
+_log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session.log"
+mkdir -p "$(dirname "$_log")" 2>/dev/null || true
+
+if ! grep -qw boot=live /proc/cmdline 2>/dev/null; then
+	_have_steam=0
+	gamebian_steam_binary_present 2>/dev/null && _have_steam=1
+	_kiosk_ok=0
+	gamebian_steam_kiosk_ready 2>/dev/null && _kiosk_ok=1
+
+	if [ "${_have_steam}" -eq 0 ] || [ "${_kiosk_ok}" -eq 0 ]; then
+		printf '%s gamescope-session: fallback openbox (steam=%s kiosk=%s ldm=%s)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" \
+			"${_have_steam}" "${_kiosk_ok}" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+		export DISPLAY="${DISPLAY:-:0}"
+		exec /usr/bin/openbox-session
+	fi
+fi
+
+if gamebian_use_steam_without_gamescope 2>/dev/null; then
+	printf '%s gamescope-session: no working gamescope — Steam on X (GAMEBIAN_SKIP_GAMESCOPE)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+	export GAMEBIAN_SKIP_GAMESCOPE=1
+else
+	printf '%s gamescope-session: starting kiosk (ldm=%s)\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+fi
+
+# Kiosk ↔ desktop handoff: stay in this LightDM login; relaunch gamescope when Openbox ends.
+while :; do
+	gamebian_kiosk_marker_set 2>/dev/null || true
+	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+	gamebian_controller_menu_pause 2>/dev/null || true
+
+	/usr/local/bin/gamebian-steam-bigpicture "$@"
+	_rc=$?
+
+	if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
+		gamebian_kiosk_openbox_handoff_set 2>/dev/null || true
+		printf '%s gamescope-session: openbox desktop — waiting (same login)\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+		while pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; do
+			if gamebian_request_gamescope_kiosk_pending 2>/dev/null; then
+				gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
+				printf '%s gamescope-session: Enter Steam requested — leaving Openbox\n' \
+					"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+				openbox --exit 2>/dev/null || pkill -u "$(id -un)" -TERM -x openbox 2>/dev/null || true
+				break
+			fi
+			sleep 0.5
+		done
+		printf '%s gamescope-session: openbox ended — return to gamescope kiosk\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+		if [ -f "${HOME}/.config/gamebian/prefer-openbox-desktop" ]; then
+			gamebian_kiosk_marker_clear 2>/dev/null || true
+			exit 0
+		fi
+		if gamebian_steam_kiosk_ready 2>/dev/null; then
+			gamebian_kiosk_openbox_handoff_clear 2>/dev/null || true
+			continue
+		fi
+		printf '%s gamescope-session: Steam not kiosk-ready — stopping supervisor\n' \
+			"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" >>"$_log" 2>/dev/null || true
+		gamebian_kiosk_marker_clear 2>/dev/null || true
+		exit "${_rc}"
+	fi
+
+	if [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
+		gamebian_handoff_to_openbox_desktop
+	fi
+	break
+done
+
+gamebian_kiosk_marker_clear 2>/dev/null || true
+exit "${_rc}"

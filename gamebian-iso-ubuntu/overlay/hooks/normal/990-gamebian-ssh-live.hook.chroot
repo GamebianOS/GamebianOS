@@ -1,0 +1,33 @@
+#!/bin/sh
+# Live ISO: host keys, password auth, socket-only sshd (OpenSSH 10 on Ubuntu).
+set -e
+rm -f /etc/ssh/sshd_not_to_be_run
+
+# Host keys are not always created during lb chroot; required for sshd -t.
+/usr/bin/ssh-keygen -A
+
+# OpenSSH 10: uncommented PasswordAuthentication defaults to no (publickey-only).
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/50-gamebian-password-auth.conf <<'EOF'
+PasswordAuthentication yes
+KbdInteractiveAuthentication yes
+PubkeyAuthentication yes
+EOF
+chmod 644 /etc/ssh/sshd_config.d/50-gamebian-password-auth.conf
+
+# Validate before enabling units (surfaces config errors at build time).
+/usr/sbin/sshd -t
+
+# Socket activation only — do not enable ssh.service (port 22 clash with ssh.socket).
+if command -v systemctl >/dev/null 2>&1; then
+	systemctl disable ssh.service 2>/dev/null || true
+	rm -f /etc/systemd/system/multi-user.target.wants/ssh.service
+	systemctl enable ssh.socket 2>/dev/null || true
+	systemctl enable gamebian-sshd-live-prep.service 2>/dev/null || true
+	systemctl enable gamebian-live-sshd-boot.service 2>/dev/null || true
+	systemctl enable gamebian-live-dns-fix.service 2>/dev/null || true
+	systemctl enable gamebian-live-calamares-prep.service 2>/dev/null || true
+	# Installed target only (script no-ops on live); first-boot fallback if Calamares skipped enable.
+	systemctl enable gamebian-sshd-installed-enable.service 2>/dev/null || true
+fi
+chmod 0755 /usr/local/sbin/gamebian-enable-sshd-installed 2>/dev/null || true

@@ -1,0 +1,23 @@
+#!/bin/sh
+# inotify_simple is imported by steam-patch / gamebian-web; install PyPI wheel if missing.
+# Best-effort — must not fail the image build.
+set +e
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export DEBIAN_FRONTEND=noninteractive
+
+_py=/usr/bin/python3
+[ -x "${_py}" ] || _py=python3
+if ! command -v "${_py}" >/dev/null 2>&1; then
+	echo "P: warning: python3 missing — skipping inotify-simple pip install" >&2
+	exit 0
+fi
+
+if "${_py}" -c "import inotify_simple" 2>/dev/null; then
+	exit 0
+fi
+
+"${_py}" -m pip install --break-system-packages --no-input inotify-simple 2>/dev/null \
+	|| "${_py}" -m pip install --no-input inotify-simple 2>/dev/null \
+	|| echo "P: warning: inotify-simple pip install failed (gamebian-web may need it later)" >&2
+
+exit 0

@@ -1,0 +1,23 @@
+#!/bin/sh
+# Enable power/wakeup on USB ancestors of an input device (gamepad wake from suspend).
+# Called from udev (%p = sysfs device path) or enable-usb-wakeup-all.
+set -eu
+
+devpath="${1:-}"
+[ -n "$devpath" ] || exit 0
+
+case "$devpath" in
+	/devices/*) sysfs="/sys${devpath}" ;;
+	/*) sysfs="/sys${devpath}" ;;
+	*) sysfs="/sys/${devpath}" ;;
+esac
+
+_path="$sysfs"
+while [ -n "$_path" ] && [ "$_path" != "/sys" ]; do
+	if [ -e "${_path}/power/wakeup" ]; then
+		echo enabled >"${_path}/power/wakeup" 2>/dev/null || true
+	fi
+	_path=$(dirname "$_path")
+done
+
+exit 0

@@ -1,0 +1,95 @@
+#!/bin/sh
+# nm-tray looks up Freedesktop NM icon names; Papirus-Dark often lacks them → white default.svg squares.
+# Symlink Papirus panel icons into Papirus-Dark and /usr/share/pixmaps (Qt pixmap fallback).
+
+set -eu
+
+PAPIRUS=/usr/share/icons/Papirus
+DARK=/usr/share/icons/Papirus-Dark
+PIXMAPS=/usr/share/pixmaps
+
+if [ ! -d "${PAPIRUS}" ] || [ ! -d "${DARK}" ]; then
+	exit 0
+fi
+
+NM_ICON_NAMES="
+network-offline
+network-wired
+network-wired-disconnected
+network-wireless-disconnected
+network-wireless-acquiring
+network-wireless-signal-none
+network-wireless-connected-00
+network-wireless-signal-weak
+network-wireless-connected-25
+network-wireless-signal-ok
+network-wireless-connected-50
+network-wireless-signal-good
+network-wireless-connected-75
+network-wireless-signal-excellent
+network-wireless-connected-100
+network-vpn
+security-low
+security-high
+preferences-system-network
+network-transmit
+"
+
+_link_icon() {
+	_name="$1"
+	_size="$2"
+	_context="$3"
+	_src=""
+	_dst="${DARK}/${_size}/${_context}/${_name}.svg"
+	if [ -e "${_dst}" ]; then
+		return 0
+	fi
+	_src="${PAPIRUS}/${_size}/${_context}/${_name}.svg"
+	if [ ! -f "${_src}" ]; then
+		_src="$(find "${PAPIRUS}" -path "*/${_name}.svg" 2>/dev/null | head -1)"
+	fi
+	[ -n "${_src}" ] && [ -f "${_src}" ] || return 1
+	mkdir -p "${DARK}/${_size}/${_context}"
+	ln -sf "${_src}" "${_dst}"
+	return 0
+}
+
+for _name in ${NM_ICON_NAMES}; do
+	_link_icon "${_name}" 16x16 panel || true
+	_link_icon "${_name}" 22x22 panel || true
+	_link_icon "${_name}" 16x16 devices || true
+	_link_icon "${_name}" 16x16 apps || true
+	_link_icon "${_name}" 16x16 status || true
+	_src=""
+	for _size in 22x22 16x16; do
+		if [ -f "${PAPIRUS}/${_size}/panel/${_name}.svg" ]; then
+			_src="${PAPIRUS}/${_size}/panel/${_name}.svg"
+			break
+		fi
+	done
+	if [ -z "${_src}" ]; then
+		_src="$(find "${PAPIRUS}" -path "*/panel/${_name}.svg" 2>/dev/null | head -1)"
+	fi
+	if [ -z "${_src}" ]; then
+		_src="$(find "${PAPIRUS}" -path "*/${_name}.svg" 2>/dev/null | head -1)"
+	fi
+	if [ -n "${_src}" ] && [ -f "${_src}" ]; then
+		_px="${PIXMAPS}/${_name}.svg"
+		ln -sfn "${_src}" "${_px}"
+	fi
+done
+
+# Bluetooth tray (blueman)
+for _name in bluetooth-active bluetooth-disabled bluetooth-inactive; do
+	_src="$(find "${DARK}" "${PAPIRUS}" -path "*/${_name}.svg" 2>/dev/null | head -1)"
+	[ -n "${_src}" ] || continue
+	_px="${PIXMAPS}/${_name}.svg"
+	[ -e "${_px}" ] || ln -sf "${_src}" "${_px}"
+done
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+	gtk-update-icon-cache -f "${DARK}" 2>/dev/null || true
+	gtk-update-icon-cache -f "${PAPIRUS}" 2>/dev/null || true
+fi
+
+exit 0

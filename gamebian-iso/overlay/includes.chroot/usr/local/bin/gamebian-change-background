@@ -1,0 +1,52 @@
+#!/bin/sh
+# Pick an image file and set it as the Openbox desktop background.
+
+export DISPLAY="${DISPLAY:-:0}"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+_uid="$(id -u)"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/${_uid}}"
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=${XDG_RUNTIME_DIR}/bus}"
+
+if [ -r /usr/share/gamebian/gamebian-wallpaper.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-wallpaper.sh
+else
+	echo "gamebian-change-background: missing gamebian-wallpaper.sh" >&2
+	exit 1
+fi
+
+_start_dir="${HOME}"
+for _d in "${HOME}/Pictures" "${HOME}/Images" "${HOME}/Downloads" \
+	/usr/share/backgrounds/gamebian-installed \
+	/usr/share/backgrounds \
+	/usr/share/pixmaps; do
+	if [ -d "${_d}" ]; then
+		_start_dir="${_d}"
+		break
+	fi
+done
+
+_picked=""
+if command -v zenity >/dev/null 2>&1; then
+	_picked="$(zenity --file-selection \
+		--title="Choose background image" \
+		--filename="${_start_dir}/" \
+		--file-filter='Image files | *.png *.jpg *.jpeg *.webp *.gif *.bmp *.PNG *.JPG *.JPEG *.WEBP *.GIF *.BMP' \
+		2>/dev/null)" || _picked=""
+fi
+
+if [ -z "${_picked}" ] && command -v thunar >/dev/null 2>&1; then
+	echo "Install zenity for a file picker, or run: feh --bg-fill /path/to/image.png" >&2
+	exit 1
+fi
+
+[ -n "${_picked}" ] || exit 0
+[ -r "${_picked}" ] || exit 1
+
+if ! gamebian_wallpaper_set_custom "${_picked}"; then
+	exit 1
+fi
+
+if command -v notify-send >/dev/null 2>&1; then
+	notify-send -a Gamebian -t 5000 "Desktop background" "Wallpaper updated." 2>/dev/null || true
+fi

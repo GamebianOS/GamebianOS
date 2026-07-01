@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=Gamebian autologin
+Comment=Internal autologin dispatcher (Openbox or Steam)
+Exec=/usr/local/bin/gamebian-autologin-session
+TryExec=/usr/local/bin/gamebian-autologin-session
+Type=XSession
+DesktopNames=gamebian-autologin
+Hidden=true

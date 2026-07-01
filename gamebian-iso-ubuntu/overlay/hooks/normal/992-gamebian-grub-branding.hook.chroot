@@ -1,0 +1,13 @@
+#!/bin/sh
+# Gamebian GRUB branding for installed systems (Ubuntu — no desktop-base dependency).
+set -e
+
+GB_GRUB=/usr/share/gamebian/branding/grub
+WALL="$GB_GRUB/wallpaper.png"
+
+if [ -f "$WALL" ]; then
+	mkdir -p /boot/grub
+	cp -a "$WALL" /boot/grub/gamebian-background.png 2>/dev/null || true
+fi
+
+exit 0

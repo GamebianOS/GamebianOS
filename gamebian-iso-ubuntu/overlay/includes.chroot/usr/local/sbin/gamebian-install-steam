@@ -1,0 +1,52 @@
+#!/bin/sh
+# Install Steam on amd64 (Ubuntu multiverse: steam-installer on 26.04+, steam on older releases).
+set -eu
+
+export DEBIAN_FRONTEND=noninteractive
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
+
+if [ "$(id -u)" -ne 0 ]; then
+	exec sudo "$0" "$@"
+fi
+
+_steam_ok() {
+	command -v steam >/dev/null 2>&1 \
+		|| [ -x /usr/games/steam ] \
+		|| [ -x /usr/bin/steam ]
+}
+
+if _steam_ok; then
+	echo "Steam already installed: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
+	exit 0
+fi
+
+if [ -r /usr/share/gamebian/ensure-apt-gaming-repos.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/ensure-apt-gaming-repos.sh
+	ensure_apt_i386
+	ensure_apt_gaming_repos
+fi
+
+apt-get update
+_steam_pkg=""
+if apt-cache show steam-installer >/dev/null 2>&1; then
+	_steam_pkg=steam-installer
+elif apt-cache show steam >/dev/null 2>&1; then
+	_steam_pkg=steam
+else
+	echo "Neither steam-installer nor steam is available in apt (enable multiverse + i386)." >&2
+	exit 1
+fi
+apt-get install -y "${_steam_pkg}"
+
+if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then
+	ln -sf ../games/steam /usr/bin/steam
+fi
+
+if _steam_ok; then
+	echo "OK: $(command -v steam 2>/dev/null || echo /usr/games/steam) (via ${_steam_pkg})"
+	exit 0
+fi
+
+echo "${_steam_pkg} finished but steam binary not found" >&2
+exit 1

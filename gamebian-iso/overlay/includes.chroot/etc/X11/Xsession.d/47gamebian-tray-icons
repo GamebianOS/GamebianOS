@@ -1,0 +1,9 @@
+# Before /etc/xdg/autostart runs nm-tray / blueman: icon theme + pixmaps for Qt6 tray.
+if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
+	# shellcheck disable=SC1091
+	. /usr/share/gamebian/gamebian-openbox-session-env.sh
+	gamebian_openbox_session_env
+fi
+if [ -x /usr/local/sbin/gamebian-install-tray-icons ]; then
+	/usr/local/sbin/gamebian-install-tray-icons 2>/dev/null || true
+fi

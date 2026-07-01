@@ -1,0 +1,6 @@
+#!/bin/sh
+# Calamares: i386 + universe/multiverse on the target before apt install (steam, libretro).
+set -eu
+. /usr/share/gamebian/ensure-apt-gaming-repos.sh
+ensure_apt_i386
+ensure_apt_gaming_repos

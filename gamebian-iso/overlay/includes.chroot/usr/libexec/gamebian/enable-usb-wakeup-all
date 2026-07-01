@@ -1,0 +1,32 @@
+#!/bin/sh
+# Enable USB wakeup for connected gamepads and host controllers (boot + before suspend).
+set -eu
+
+_enable() {
+	[ -n "${1:-}" ] || return 0
+	/usr/libexec/gamebian/enable-usb-wakeup "$1" 2>/dev/null || true
+}
+
+# Joysticks / gamepads already bound
+for js in /dev/input/js*; do
+	[ -e "$js" ] || continue
+	_path=$(udevadm info -q path -n "$js" 2>/dev/null) || continue
+	_enable "$_path"
+done
+
+# udev properties are more reliable than js* alone (some pads are event-only)
+for ev in /dev/input/event*; do
+	[ -e "$ev" ] || continue
+	if udevadm info -q property -n "$ev" 2>/dev/null | grep -qE '^ID_INPUT_(JOYSTICK|GAMEPAD)=1'; then
+		_path=$(udevadm info -q path -n "$ev" 2>/dev/null) || continue
+		_enable "$_path"
+	fi
+done
+
+# Root USB buses / hubs (needed on some laptops for port wake)
+for w in /sys/bus/usb/devices/usb*/power/wakeup; do
+	[ -e "$w" ] || continue
+	echo enabled >"$w" 2>/dev/null || true
+done
+
+exit 0

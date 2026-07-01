@@ -1,0 +1,42 @@
+---
+componentName: gamebian
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 800px,580px
+windowPlacement: center
+
+strings:
+    productName:         GamebianUbuntu
+    shortProductName:    GamebianUbuntu
+    version:             "26.04 LTS"
+    shortVersion:        "26.04"
+    versionedName:       GamebianUbuntu 26.04 LTS
+    shortVersionedName:  GamebianUbuntu
+    bootloaderEntryName: GamebianUbuntu
+    productUrl:          https://gamebianos.com/
+    supportUrl:          https://gamebianos.com/
+    knownIssuesUrl:      https://gamebianos.com/
+    releaseNotesUrl:     https://gamebianos.com/
+    donateUrl:           https://gamebianos.com/
+
+sidebar: widget
+navigation: widget
+
+# Image files are produced by calamares/merge.sh from Build/images/:
+#   calamares/image.png      -> welcome.png (+ slide1.png for show.qml): main large pane
+#   calamares/user-icon.png  -> gamebian-logo.png: icon above sidebar step list (+ window icon)
+images:
+    productLogo:         "gamebian-logo.png"
+    productIcon:         "gamebian-logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+
+style:
+    SidebarBackground:         "#0145F2"
+    SidebarText:               "#FFFFFF"
+    SidebarTextCurrent:        "#FFFFFF"
+    SidebarBackgroundCurrent:  "#056EDB"
+
+slideshowAPI: 2

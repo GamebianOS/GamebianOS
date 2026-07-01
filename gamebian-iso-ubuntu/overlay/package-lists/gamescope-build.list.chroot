@@ -1,0 +1,16 @@
+# Ubuntu: gamescope is installed from apt (openbox.list.chroot + hook 997).
+# Keep minimal source-build fallback deps only if apt install fails during ISO build.
+git
+build-essential
+meson
+ninja-build
+cmake
+pkg-config
+libdrm-dev
+libvulkan-dev
+libwayland-dev
+libx11-dev
+libsdl2-dev
+libpipewire-0.3-dev
+libliftoff-dev
+xwayland

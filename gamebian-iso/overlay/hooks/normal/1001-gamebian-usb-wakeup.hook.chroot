@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+chmod 0755 /usr/libexec/gamebian/enable-usb-wakeup 2>/dev/null || true
+chmod 0755 /usr/libexec/gamebian/enable-usb-wakeup-all 2>/dev/null || true
+chmod 0755 /usr/lib/systemd/system-sleep/gamebian-usb-wakeup 2>/dev/null || true
+systemctl enable gamebian-usb-wakeup.service 2>/dev/null || true
