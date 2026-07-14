@@ -1,6 +1,16 @@
 #!/bin/sh
 # Live ISO: host keys, password auth, socket-only sshd (OpenSSH 10 on Ubuntu).
 set -e
+export DEBIAN_FRONTEND=noninteractive
+
+# Ensure packages are present even if a package-list stage was skipped/cached.
+if ! dpkg -s openssh-server >/dev/null 2>&1 || ! command -v ssh >/dev/null 2>&1; then
+	apt-get update -qq || apt-get update
+	apt-get install -y --no-install-recommends openssh-server openssh-client
+fi
+command -v ssh >/dev/null 2>&1
+command -v sshd >/dev/null 2>&1 || test -x /usr/sbin/sshd
+
 rm -f /etc/ssh/sshd_not_to_be_run
 
 # Host keys are not always created during lb chroot; required for sshd -t.

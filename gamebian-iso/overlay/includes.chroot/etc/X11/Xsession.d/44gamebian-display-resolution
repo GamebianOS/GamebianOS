@@ -1,0 +1,6 @@
+# Early in every X session (Openbox + gamescope): use monitor max/preferred mode.
+if [ -r /usr/share/gamebian/gamebian-display-resolution.sh ]; then
+	# shellcheck source=/usr/share/gamebian/gamebian-display-resolution.sh
+	. /usr/share/gamebian/gamebian-display-resolution.sh
+	gamebian_ensure_native_resolution 2>/dev/null || true
+fi

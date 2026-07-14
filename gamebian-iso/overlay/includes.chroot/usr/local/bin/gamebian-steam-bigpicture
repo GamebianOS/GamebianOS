@@ -10,9 +10,9 @@
 # controller input in games; omitting it breaks gamepads in the kiosk session. Opt out:
 # GAMEBIAN_GAMESCOPE_NO_STEAM=1. Legacy kiosk-only opt-out: GAMEBIAN_GAMESCOPE_KIOSK_EMBED=0.
 # Toggle fullscreen if stuck: Meta/Super+F (gamescope default).
-# Optional kiosk output size when not embedding: GAMEBIAN_GAMESCOPE_WH="-W 1920 -H 1080".
-# Embedded kiosk (-e, default): uses native X resolution (-f fullscreen); no forced -W/-H.
-# Bare compositor (GAMEBIAN_GAMESCOPE_KIOSK_EMBED=0): auto -W/-H from xrandr preferred mode.
+# Output size: always passes -W/-H from the default display's max xrandr mode (gamescope
+# defaults to 1280x720 without them). Override: GAMEBIAN_GAMESCOPE_WH="-W 1920 -H 1080".
+# Skip auto size (gamescope default): GAMEBIAN_GAMESCOPE_NO_AUTO_WH=1.
 # Hybrid NVIDIA + Mesa NVK: gamescope often fails unless you force another Vulkan ICD or device:
 #   GAMEBIAN_VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/radeon_icd.json  (colon-separated list ok; name varies — ls icd.d)
 #   GAMEBIAN_GAMESCOPE_EXTRA_ARGS='--prefer-vk-device …'  # run: gamescope --help
@@ -146,29 +146,34 @@ if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 	esac
 fi
 
-# Kiosk output size (-W/-H): embedded (-e) uses native X resolution; bare compositor auto-detects.
+# Output size (-W/-H): max mode on the default connected output. Without this, gamescope
+# often stays at 1280x720 even with -f (looks like a forced small resolution).
 _GAMESCOPE_WH=""
 _GAMESCOPE_GAME_WH=""
-if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-	&& command -v gamebian_ensure_native_resolution >/dev/null 2>&1; then
+if command -v gamebian_ensure_native_resolution >/dev/null 2>&1; then
 	gamebian_ensure_native_resolution 2>/dev/null || true
+	if command -v gamebian_xrandr_query >/dev/null 2>&1; then
+		_xr_now="$(gamebian_xrandr_query 2>/dev/null | grep -E ' connected' | head -1)"
+		log "X mode after xrandr: ${_xr_now:-unknown}"
+	fi
 fi
 if [ -n "${GAMEBIAN_GAMESCOPE_WH:-}" ]; then
 	_GAMESCOPE_WH="${GAMEBIAN_GAMESCOPE_WH}"
-elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -z "${_EMBED_UNDER_X}" ]; then
+	log "gamescope output from GAMEBIAN_GAMESCOPE_WH: ${_GAMESCOPE_WH}"
+else
 	case "${GAMEBIAN_GAMESCOPE_NO_AUTO_WH:-}" in
-		1|yes|true|YES|TRUE) ;;
+		1|yes|true|YES|TRUE)
+			log "GAMEBIAN_GAMESCOPE_NO_AUTO_WH set — gamescope may default to 1280x720"
+			;;
 		*)
 			if _auto_wh="$(gamebian_detect_gamescope_wh 2>/dev/null)"; then
 				_GAMESCOPE_WH="${_auto_wh}"
-				log "kiosk: compositor output from xrandr: ${_GAMESCOPE_WH}"
+				log "gamescope output from xrandr max: ${_GAMESCOPE_WH}"
 			else
-				log "kiosk: xrandr auto size failed — set GAMEBIAN_GAMESCOPE_WH or fix DISPLAY"
+				log "xrandr auto size failed — set GAMEBIAN_GAMESCOPE_WH or fix DISPLAY (gamescope default is often 1280x720)"
 			fi
 			;;
 	esac
-elif [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -n "${_EMBED_UNDER_X}" ]; then
-	log "kiosk: embedded gamescope — native X resolution (no -W/-H override)"
 fi
 if [ -n "${GAMEBIAN_GAMESCOPE_GAME_WH:-}" ]; then
 	_GAMESCOPE_GAME_WH="${GAMEBIAN_GAMESCOPE_GAME_WH}"

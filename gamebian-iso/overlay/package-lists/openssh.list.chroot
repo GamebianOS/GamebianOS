@@ -1,0 +1,4 @@
+# OpenSSH client + server (live ISO and installed disk).
+# Kept as its own list so live-build always pulls ssh even if other lists change.
+openssh-client
+openssh-server
