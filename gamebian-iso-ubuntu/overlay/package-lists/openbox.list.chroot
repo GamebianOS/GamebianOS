@@ -1,7 +1,18 @@
-# Minimal boot / admin / connectivity (beyond the graphical stack)
+# Minimal Ubuntu live ISO desktop (<2GB target).
+# Deferred to Calamares (live is try/install only):
+#   steam-installer, steam-devices, papirus (large), epiphany, RetroArch/emulators,
+#   flatpak, gamebian-web Python stack
+# See packages.conf + gamebian-web-install + gamebian-install-steam.
+
 sudo
 systemd-sysv
 initramfs-tools
+# live-config Recommends — required with --apt-recommends false.
+# Without user-setup the live user is never created → tty/LightDM "Authentication failure".
+user-setup
+live-tools
+locales
+keyboard-configuration
 network-manager
 nm-tray
 bluez
@@ -27,16 +38,12 @@ zenity
 libnotify-bin
 xfce4-notifyd
 
-adwaita-icon-theme
-adwaita-icon-theme-legacy
-mint-y-icons
-numix-icon-theme-circle
-paper-icon-theme
-papirus-icon-theme
-yaru-theme-icon
-
+# Papirus deferred to Calamares (hundreds of MB); live uses hicolor fallbacks.
 lightdm
 lightdm-gtk-greeter
+# LightDM only Recommends xserver-xorg — required explicitly with --apt-recommends false.
+# Without it the live ISO boots to getty (TTY) and Calamares never starts.
+xserver-xorg
 
 openbox
 python3
@@ -53,15 +60,18 @@ rofi
 feh
 thunar
 xfce4-terminal
-epiphany-browser
 pavucontrol
 
-# Steam: Ubuntu multiverse (i386 via includes.chroot_before_packages).
-# Resolute 26.04 ships steam-installer (transitional name), not the steam metapackage.
-steam-installer
-steam-devices
-# gamescope: from Ubuntu universe; hook 997 retries apt if missing on squashfs.
+# gamescope from Ubuntu universe — needed after unpack onto disk; small vs Steam/emulators.
 gamescope
+xwayland
 
 calamares
+# Calamares unpackfs needs unsquashfs — only a Recommends of calamares.
+squashfs-tools
+# Calamares partition/format — not pulled with --apt-recommends false.
+# Without e2fsprogs, erase-disk install fails creating the ext4 filesystem.
+e2fsprogs
+dosfstools
+parted
 qml-module-qtquick-controls2

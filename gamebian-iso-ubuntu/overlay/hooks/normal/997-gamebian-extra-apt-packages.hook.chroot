@@ -1,5 +1,6 @@
 #!/bin/sh
-# gamescope (Ubuntu apt) + libretro-* (universe/multiverse).
+# Ubuntu slim live ISO: apt gamescope only. RetroArch / libretro / dolphin → Calamares.
+# Always purge any leftover source-build toolchain so it cannot bloat the squashfs.
 # Best-effort only — must never fail the image build (set -e is intentionally omitted).
 export DEBIAN_FRONTEND=noninteractive
 
@@ -46,39 +47,64 @@ for _bin in gamescope steam; do
 	fi
 done
 
-_list=/usr/share/gamebian/ubuntu-retroarch.list
-if [ -f "$_list" ]; then
+# Slim live ISO: skip RetroArch / N64 / Dolphin (Calamares gamebian-web-install).
+if [ "${GAMEBIAN_LIVE_INCLUDE_EMULATORS:-0}" = "1" ]; then
+	_list=/usr/share/gamebian/ubuntu-retroarch.list
+	if [ -f "$_list" ]; then
+		while read -r _pkg; do
+			case "$_pkg" in ''|\#*) continue ;; esac
+			install_one "$_pkg" || true
+		done <"$_list"
+	fi
+
+	_m64_log=/var/log/gamebian-install-mupen64plus-next.log
+	if [ ! -f /usr/lib/x86_64-linux-gnu/libretro/mupen64plus_next_libretro.so ] \
+		&& [ -x /usr/local/sbin/gamebian-install-libretro-mupen64plus-next ]; then
+		/usr/local/sbin/gamebian-install-libretro-mupen64plus-next 2>&1 | tee "${_m64_log}" || true
+	fi
+
+	_dolphin_log=/var/log/gamebian-install-libretro-dolphin.log
+	if [ ! -f /usr/lib/x86_64-linux-gnu/libretro/dolphin_libretro.so ] \
+		&& [ -x /usr/local/sbin/gamebian-install-libretro-dolphin ]; then
+		/usr/local/sbin/gamebian-install-libretro-dolphin 2>&1 | tee "${_dolphin_log}" || true
+	fi
+else
+	echo "P: slim live ISO — skipping RetroArch/emulators (Calamares gamebian-web-install)"
+fi
+
+# Always drop source-build toolchain if anything pulled it in (apt gamescope path or fallback).
+_purge_pkgs="
+	build-essential git meson ninja-build cmake
+	libdrm-dev libvulkan-dev libwayland-dev libx11-dev libsdl2-dev
+	libpipewire-0.3-dev libliftoff-dev libdisplay-info-dev libseat-dev
+	glslang-tools glslang-dev spirv-headers spirv-tools
+	libgbm-dev libei-dev libxxhash-dev libdav1d-dev
+"
+_build_list=/usr/share/gamebian/gamescope-build.list
+if [ -f "$_build_list" ]; then
 	while read -r _pkg; do
 		case "$_pkg" in ''|\#*) continue ;; esac
-		install_one "$_pkg" || true
-	done <"$_list"
-else
-	echo "P: warning: missing $_list — no libretro cores installed in ISO" >&2
+		_purge_pkgs="${_purge_pkgs} ${_pkg}"
+	done <"$_build_list"
+fi
+echo "P: purging gamescope build leftovers from squashfs (if any)…"
+# shellcheck disable=SC2086
+apt-get purge -y ${_purge_pkgs} 2>/dev/null || true
+apt-get autoremove -y --purge || true
+
+# Keep gamescope runtime if apt package is present.
+if dpkg -s gamescope >/dev/null 2>&1; then
+	apt-get install -y --no-install-recommends gamescope xwayland || true
+elif command -v gamescope >/dev/null 2>&1; then
+	apt-get install -y --no-install-recommends xwayland \
+		libsdl2-2.0-0 libpipewire-0.3-0 libvulkan1 \
+		libwayland-client0 libwayland-server0 libdrm2 libgbm1 || true
 fi
 
-_m64_log=/var/log/gamebian-install-mupen64plus-next.log
-if [ -f /usr/lib/x86_64-linux-gnu/libretro/mupen64plus_next_libretro.so ]; then
-	echo "P: mupen64plus_next libretro core already on image"
-elif [ -x /usr/local/sbin/gamebian-install-libretro-mupen64plus-next ]; then
-	echo "P: installing mupen64plus_next libretro core (not in Ubuntu apt)…"
-	/usr/local/sbin/gamebian-install-libretro-mupen64plus-next 2>&1 | tee "${_m64_log}" || {
-		echo "P: warning: mupen64plus_next install failed — see ${_m64_log}" >&2
-	}
-else
-	echo "P: warning: missing gamebian-install-libretro-mupen64plus-next — no N64 core on ISO" >&2
-fi
-
-_dolphin_log=/var/log/gamebian-install-libretro-dolphin.log
-if [ -f /usr/lib/x86_64-linux-gnu/libretro/dolphin_libretro.so ]; then
-	echo "P: dolphin libretro core already on image"
-elif [ -x /usr/local/sbin/gamebian-install-libretro-dolphin ]; then
-	echo "P: installing dolphin libretro core (GameCube/Wii; not in Ubuntu apt)…"
-	/usr/local/sbin/gamebian-install-libretro-dolphin 2>&1 | tee "${_dolphin_log}" || {
-		echo "P: warning: dolphin libretro install failed — see ${_dolphin_log}" >&2
-	}
-else
-	echo "P: warning: missing gamebian-install-libretro-dolphin — GameCube/Wii need dolphin-emu only" >&2
-fi
+apt-get clean || true
+rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb \
+	/var/tmp/gamebian-gamescope-src /var/tmp/gamebian-gamescope-build \
+	/tmp/gamebian-* 2>/dev/null || true
 
 if command -v gamescope >/dev/null 2>&1 && gamescope --help >/dev/null 2>&1; then
 	echo "P: gamescope OK: $(command -v gamescope) — $(gamescope --help 2>&1 | head -n 1)"

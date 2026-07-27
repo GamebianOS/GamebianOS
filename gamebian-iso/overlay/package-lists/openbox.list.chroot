@@ -1,7 +1,17 @@
-# Minimal boot / admin / connectivity (beyond the graphical stack)
+# Minimal live ISO desktop (<2GB target).
+# Deferred to Calamares / first boot (not needed to try or install):
+#   steam-installer, steam-devices, epiphany, extra icon themes, RetroArch/emulators, flatpak
+# See packages.conf + gamebian-web-install + gamebian-install-steam.
+
 sudo
 systemd-sysv
 linux-image-amd64
+# live-config Recommends — required with --apt-recommends false.
+# Without user-setup the live user is never created → tty/LightDM "Authentication failure".
+user-setup
+live-tools
+locales
+keyboard-configuration
 network-manager
 # Tray: nm-tray (Qt); blueman-applet (GTK) for Bluetooth — start after lxpanel systray in autostart
 nm-tray
@@ -33,18 +43,15 @@ libnotify-bin
 # Desktop notifications without a GNOME/KDE shell (notify-send needs a dbus service)
 xfce4-notifyd
 
-# Icon themes (Papirus is default in skel GTK settings; others available in lxappearance)
-adwaita-icon-theme
-adwaita-icon-theme-legacy
-mint-y-icons
-numix-icon-theme-circle
-paper-icon-theme
+# Default icon theme only (Papirus in skel GTK settings). Extra themes bloat the squashfs.
 papirus-icon-theme
-yaru-theme-icon
 
 # Display manager + Openbox session (exact Gamebian desktop stack)
 lightdm
 lightdm-gtk-greeter
+# LightDM only Recommends xserver-xorg — required explicitly with --apt-recommends false.
+# Without it the live ISO boots to getty (TTY) and Calamares never starts.
+xserver-xorg
 desktop-base
 
 openbox
@@ -64,18 +71,22 @@ rofi
 feh
 thunar
 xfce4-terminal
-# GNOME Web (WebKitGTK); chroot hook sets x-www-browser alternative.
-epiphany-browser
 # Audio mixer GUI (outputs, per-app levels); works with PipeWire via Pulse compatibility.
 pavucontrol
 
-# Steam: Debian testing/stable use steam-installer (+ steam-libs, steam-libs-i386), not Valve’s steam-launcher.
-# i386: includes.chroot_before_packages/root/packages.foreign-architectures (live-build runs dpkg --add-architecture).
-steam-installer
-steam-devices
+# gamescope runtime helper (binary from hook 997 source build; toolchain purged after).
+xwayland
 # gamescope: built from source (gamescope-build.list.chroot + hook 997); not a trixie .deb.
+# Steam: Calamares packages.conf + gamebian-install-steam (not on live squashfs).
 
 # Installer (removed from disk install via Calamares packages module + autoremove)
 calamares
 calamares-settings-debian
+# Calamares unpackfs needs unsquashfs — only a Recommends of calamares.
+squashfs-tools
+# Calamares partition/format — not pulled with --apt-recommends false.
+# Without e2fsprogs, erase-disk install fails creating the ext4 filesystem.
+e2fsprogs
+dosfstools
+parted
 qml-module-qtquick-controls2

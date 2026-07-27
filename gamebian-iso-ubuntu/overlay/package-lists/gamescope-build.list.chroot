@@ -1,16 +1,9 @@
-# Ubuntu: gamescope is installed from apt (openbox.list.chroot + hook 997).
-# Keep minimal source-build fallback deps only if apt install fails during ISO build.
-git
-build-essential
-meson
-ninja-build
-cmake
-pkg-config
-libdrm-dev
-libvulkan-dev
-libwayland-dev
-libx11-dev
-libsdl2-dev
-libpipewire-0.3-dev
-libliftoff-dev
-xwayland
+# Ubuntu slim live ISO: gamescope comes from apt (openbox.list.chroot).
+# Do NOT list build deps here — live-build would bake them into every squashfs.
+# Source-build fallback installs deps inside gamebian-install-gamescope, then
+# hook 997 purges /usr/share/gamebian/gamescope-build.list if present.
+#
+# Optional fallback package names (for purge helper / manual source builds only):
+# git build-essential meson ninja-build cmake pkg-config
+# libdrm-dev libvulkan-dev libwayland-dev libx11-dev libsdl2-dev
+# libpipewire-0.3-dev libliftoff-dev

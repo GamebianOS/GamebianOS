@@ -1,25 +1,5 @@
-# gamebian-web runtime (same set as Calamares usr/local/sbin/gamebian-web-install).
-# Keeps /usr/lib/python3/dist-packages populated so staged /usr/src/gamebian-web and
-# pip --prefix=/usr installs align with apt; also covers steam-patch (yaml, inotify_simple).
+# Slim live ISO: no gamebian-web Python / flatpak on the squashfs.
+# Calamares gamebian-web-install apt-installs the full runtime on the target disk
+# (live session never runs gamebian-web; source is staged at /usr/src/gamebian-web).
 #
-# inotify_simple: not reliably packaged as python3-inotify-simple on all Debian releases —
-# hooks/normal/996-gamebian-inotify-pip.hook.chroot installs PyPI inotify-simple.
-#
-# RetroArch + libretro cores: 997-gamebian-extra-apt-packages.hook.chroot + Calamares install.
-flatpak
-python3-pip
-python3-setuptools
-python3-wheel
-python3-bottle
-python3-yaml
-python3-requests
-python3-beaker
-python3-bcrypt
-python3-psutil
-python3-pyudev
-python3-pyglet
-python3-pil
-python3-waitress
-python3-pyftpdlib
-python3-vdf
-python3-plyvel
+# Placeholder so live-build still sees the list file (comments only = no packages).

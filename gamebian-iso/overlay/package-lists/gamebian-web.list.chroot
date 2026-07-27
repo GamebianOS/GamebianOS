@@ -5,8 +5,8 @@
 # inotify_simple: not reliably packaged as python3-inotify-simple on all Debian releases —
 # hooks/normal/996-gamebian-inotify-pip.hook.chroot installs PyPI inotify-simple.
 #
-# RetroArch + libretro cores: 997-gamebian-extra-apt-packages.hook.chroot + Calamares install.
-flatpak
+# flatpak + RetroArch / libretro / dolphin: deferred to Calamares gamebian-web-install
+# (keeps the live ISO under ~2GB; live session never runs gamebian-web).
 python3-pip
 python3-setuptools
 python3-wheel

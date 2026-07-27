@@ -1,4 +1,7 @@
-# gamescope: built from source in hook 997 (not a binary .deb). Toolchain + -dev libs on squashfs.
+# gamescope: built from source in hook 997 (not a binary .deb).
+# These toolchain / -dev packages are purged at the end of hook 997 so they do not
+# stay on the live squashfs (largest Debian ISO size win after dropping Steam).
+# Runtime xwayland lives in openbox.list.chroot.
 git
 build-essential
 meson
@@ -60,5 +63,4 @@ libudev-dev
 libei-dev
 libxxhash-dev
 libdav1d-dev
-xwayland
 # libopenvr-dev / libspirv-tools-dev: not in trixie; gamescope meson builds without OpenVR on Debian.

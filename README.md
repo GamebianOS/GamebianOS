@@ -52,6 +52,7 @@ cd Build/gamebian-iso-ubuntu
 
 Default build output: `/home/khinds/gamebian-ubuntu-build-iso` (override with `GAMEBIANUBUNTU_BUILD_ROOT`).
 
+**Slim live ISO (<2GB):** no Steam/i386, Papirus, RetroArch, flatpak, or gamebian-web Python stack on the squashfs; `gamescope-build` toolchain is not in package-lists (apt `gamescope` only). Calamares installs the deferred packages onto disk. Squashfs uses xz (mksquashfs xz has no compression-level option).
 Build host for Ubuntu: Ubuntu 26.04 (resolute) recommended. On Debian, install `ubuntu-keyring` for debootstrap.
 
 Branding PNGs for both profiles: edit `Build/images/` then re-run `./setup.sh` in either profile directory.
@@ -105,9 +106,13 @@ From `Build/gamebian-iso/`:
 
 1. **`./setup.sh`** — Runs `lb config` for **Debian trixie**, merges `overlay/` (package lists, hooks, `includes.chroot` files), copies Calamares branding/modules from `gamebian-iso/calamares/`, stages `Packages/gamebian-web` at `/usr/src/gamebian-web` on the squashfs, generates color themes, and resets the live-build chroot.
 2. **`./build.sh`** — Runs `sudo lb build` in `GAMEBIANOS_BUILD_ROOT` (default `/home/khinds/gamebianos-build-iso`). Output is a **hybrid ISO** you can dd to USB or boot in a VM.
-3. **Hook 997** (during `lb build`, needs network) — Builds **gamescope** from GitHub, installs libretro cores from `debian-retroarch.list`, and optionally builds N64 / Dolphin libretro cores. Failures are logged but do not fail the image; missing gamescope sets `/etc/gamebian/steam-without-gamescope`.
+3. **Hook 997** (during `lb build`, needs network) — Builds **gamescope** from GitHub, then **purges** the build toolchain from the squashfs. RetroArch / libretro / Dolphin are **skipped** on the slim live ISO (installed later by Calamares `gamebian-web-install`). Failures are logged but do not fail the image; missing gamescope sets `/etc/gamebian/steam-without-gamescope`.
 
-The squashfs already contains: Openbox + LightDM, **Calamares**, `steam-installer`, session glue scripts, and (usually) a working `gamescope` binary. **gamebian-web is not running on the live session** — only its source is staged for Calamares.
+The squashfs already contains: Openbox + LightDM, **Calamares**, session glue scripts, and (usually) a working `gamescope` binary. **Steam, RetroArch/emulators, and flatpak are not on the slim live ISO** — Calamares installs them onto the target disk (`packages` + `gamebian-web-install` + `gamebian-install-steam`). **gamebian-web is not running on the live session** — only its source is staged for Calamares.
+
+**Slim live ISO (<2GB):** `setup.sh` uses `--apt-recommends false` and xz squashfs compression. Hook 997 builds gamescope then **purges** the `gamescope-build` toolchain. Set `GAMEBIAN_LIVE_INCLUDE_EMULATORS=1` during `lb build` only if you want RetroArch baked into the ISO again.
+
+**Live boot must-haves (both profiles):** package lists explicitly include `user-setup` / `live-tools` / `locales` / `keyboard-configuration` (live-config Recommends) so the `live` user is created; **`xserver-xorg`** (LightDM Recommends — without it LightDM cannot start X and the live ISO drops to a getty); **`squashfs-tools`** (Calamares Recommends — without `unsquashfs`, unpackfs fails); and **`e2fsprogs` / `dosfstools` / `parted`** (Calamares erase-disk needs `mkfs.ext4` / FAT / parted — otherwise install fails creating the root filesystem). Never order an SSH oneshot `Before=ssh.socket` and then `systemctl start ssh.socket` — that deadlocks boot (`gamebian-live-sshd-boot.service` removed; `gamebian-sshd-installed-enable.service` only enables the socket, with `TimeoutStartSec=30`). `gamebian-sshd-live-prep.service` + `ssh.socket` remain.
 
 ### Step 1 — Boot the live ISO
 
@@ -130,7 +135,7 @@ Calamares unpacks the live squashfs onto the target partition and runs (in order
 | `displaymanager` | Enables LightDM; greeter default session file is Openbox |
 | `shellprocess@gamebian-network` | NetworkManager permissions |
 | `shellprocess@gamebian-apt-sources` | Enables **i386**, **contrib**, **non-free** |
-| `packages` | Extra target packages including `steam-installer` |
+| `packages` | Extra target packages including `steam-installer` (slim live ISO omits Steam from squashfs) |
 | `shellprocess@gamebian-sshprep` | Removes live autologin + legacy LightDM drop-ins; chmods session scripts; runs **`gamebian-install-steam`** (fast if already on squashfs) |
 | `shellprocess@gamebian-gamescope` | Rebuilds gamescope on target if missing (up to 7200s timeout) |
 | `shellprocess@gamebian-web` | pip-installs **gamebian-web**, enables `:8844` service |
@@ -300,7 +305,7 @@ flowchart TD
 | Web install (target only) | `calamares/usr/local/sbin/gamebian-web-install` | APT + pip install `gamebian-web` in installed chroot |
 | APT sources helper | `usr/local/sbin/gamebian-ensure-apt-sources` | Enables contrib/non-free before Calamares apt steps |
 
-`steam-installer` is in the squashfs (`overlay/package-lists/openbox.list.chroot`). First-boot terminal logic is **skipped on live** (every relevant script checks `grep boot=live /proc/cmdline`).
+`steam-installer` is installed by Calamares (`packages.conf` + `gamebian-install-steam`), not baked into the slim live squashfs. First-boot terminal logic is **skipped on live** (every relevant script checks `grep boot=live /proc/cmdline`).
 
 #### gamescope is not a normal package list entry
 
@@ -680,9 +685,9 @@ LightDM autologin
                  → gamescope + steam
 ```
 
-**Install time (Calamares):** `gamebian-ensure-apt-sources` → apt retroarch list → `gamebian-install-steam` / `gamebian-install-gamescope` → libretro extras (N64, Dolphin).
+**ISO hook 997:** gamescope build + purge of build toolchain. RetroArch cores skipped on slim live ISO.
 
-**ISO hook 997:** gamescope build, `debian-retroarch.list` packages, `gamebian-install-libretro-mupen64plus-next`, `gamebian-install-libretro-dolphin`.
+**Install time (Calamares):** `gamebian-ensure-apt-sources` → apt steam + RetroArch list via `gamebian-web-install` → `gamebian-install-steam` / `gamebian-install-gamescope` → libretro extras (N64, Dolphin).
 
 ### Desktop mode: Install Steam UX
 

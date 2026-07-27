@@ -1,5 +1,5 @@
 #!/bin/sh
-# Installed disk: ensure openssh-server is present and ssh.socket is listening on port 22.
+# Installed disk: ensure openssh-server is present and ssh.socket is enabled.
 # Calamares passes --from-calamares (live ISO still has boot=live in /proc/cmdline during install).
 # First-boot service skips when /run/live/medium exists.
 set -eu
@@ -17,23 +17,28 @@ fi
 
 rm -f /etc/ssh/sshd_not_to_be_run
 
-if ! dpkg -s openssh-server >/dev/null 2>&1; then
-	export DEBIAN_FRONTEND=noninteractive
-	apt-get update -qq 2>/dev/null || true
-	apt-get install -y --no-install-recommends openssh-server openssh-client
+# Apt only during Calamares (has network + long timeout). First-boot must never
+# block on apt-get update/install — that hangs multi-user.target with no limit.
+if [ "${_from_calamares}" -eq 1 ]; then
+	if ! dpkg -s openssh-server >/dev/null 2>&1; then
+		export DEBIAN_FRONTEND=noninteractive
+		apt-get update -qq 2>/dev/null || true
+		apt-get install -y --no-install-recommends openssh-server openssh-client
+	fi
 fi
 
 if [ ! -f /etc/ssh/ssh_host_ed25519_key ] && [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 	ssh-keygen -A
 fi
+# sshd -t needs PrivSep dir; Calamares chroot / early boot may not have run tmpfiles yet.
+mkdir -p /run/sshd
+chmod 0755 /run/sshd
 /usr/sbin/sshd -t
 
-# Debian trixie+ / Ubuntu: socket activation — do not enable ssh.service (bind clash on port 22).
+# Socket activation only — never enable/start ssh.service (port 22 clash).
+# Never systemctl start ssh.socket from a unit ordered around ssh.socket.
 systemctl disable ssh.service 2>/dev/null || true
 systemctl enable ssh.socket 2>/dev/null || true
-if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-	systemctl start ssh.socket 2>/dev/null || true
-fi
 
 systemctl disable gamebian-live-dns-fix.service 2>/dev/null || true
 systemctl disable gamebian-live-calamares-prep.service 2>/dev/null || true

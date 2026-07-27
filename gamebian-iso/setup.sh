@@ -32,11 +32,14 @@ fi
 # No kernel splash: Plymouth/framebuffer takeover hides printk on tty; GRUB GFX menu stays (bootloaders/splash.png).
 # See Build/metadata/debian.env and packaging/$GAMEBIAN_RETROARCH_LIST.
 _bootappend="boot=live components username=live hostname=${GAMEBIAN_LIVE_HOSTNAME}"
+# Slim live ISO: no Recommends, xz squashfs (target <2GB). Full Steam/emulators land via Calamares.
 lb config \
   --distribution "$LB_DISTRIBUTION" \
   --debootstrap-options "--variant=minbase" \
   --debian-installer none \
   --archive-areas "$LB_ARCHIVE_AREAS" \
+  --apt-recommends false \
+  --chroot-squashfs-compression-type xz \
   --binary-image iso-hybrid \
   --bootloaders "grub-pc grub-efi" \
   --bootappend-live "$_bootappend"
@@ -70,6 +73,13 @@ if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
 fi
 
+# Remove a stale unit from older build roots. It ran `systemctl start ssh.socket`
+# while ordered Before=ssh.socket, so systemd waited on itself during live boot.
+rm -f \
+  "$BUILD_ROOT/config/includes.chroot/lib/systemd/system/gamebian-live-sshd-boot.service" \
+  "$BUILD_ROOT/config/includes.chroot/usr/lib/systemd/system/gamebian-live-sshd-boot.service" \
+  "$BUILD_ROOT/config/includes.chroot/etc/systemd/system/multi-user.target.wants/gamebian-live-sshd-boot.service"
+
 if [[ -f "$METADATA/$GAMEBIAN_DISTRO_CONF" ]]; then
   mkdir -p "$BUILD_ROOT/config/includes.chroot/etc/gamebian"
   cp -a "$METADATA/$GAMEBIAN_DISTRO_CONF" \
@@ -85,12 +95,21 @@ if [[ -f "$ENSURE_APT_SRC" ]]; then
   chmod 0644 "$ENSURE_APT_DST"
 fi
 
-# RetroArch package names for post-install hook + Calamares (not live-build *.list.chroot — see 997 hook).
+# RetroArch package names for Calamares gamebian-web-install (not on slim live squashfs by default).
 RETRO_PKG_SRC="$SCRIPT_ROOT/../../Packages/gamebian-web/packaging/$GAMEBIAN_RETROARCH_LIST"
 RETRO_PKG_SHARE="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/$GAMEBIAN_RETROARCH_LIST"
 if [[ -f "$RETRO_PKG_SRC" ]]; then
   mkdir -p "$(dirname "$RETRO_PKG_SHARE")"
   cp -a "$RETRO_PKG_SRC" "$RETRO_PKG_SHARE"
+fi
+
+# gamescope-build package names for hook 997 purge after source build.
+GSCOPE_BUILD_LIST="$OVERLAY/package-lists/gamescope-build.list.chroot"
+GSCOPE_BUILD_SHARE="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/gamescope-build.list"
+if [[ -f "$GSCOPE_BUILD_LIST" ]]; then
+  mkdir -p "$(dirname "$GSCOPE_BUILD_SHARE")"
+  # Strip live-build comments that are not package names for the purge helper.
+  grep -v '^#' "$GSCOPE_BUILD_LIST" | grep -v '^[[:space:]]*$' > "$GSCOPE_BUILD_SHARE" || true
 fi
 
 # Controller menu: source lives under Build/share/gamebian/ (same path on ISO as before).
@@ -237,6 +256,7 @@ done
 
 echo "Configured: overlay merged into $BUILD_ROOT/config"
 echo "Artifacts (binary/, iso) go to: $BUILD_ROOT"
+echo "Slim live ISO: Steam / RetroArch / flatpak deferred to Calamares; gamescope toolchain purged after build."
 echo "gamescope: hook 997 builds ValveSoftware/gamescope @ ${GAMEBIAN_GAMESCOPE_GIT_REF} during lb build (needs network)."
-echo "N64 core: hook 997 runs gamebian-install-libretro-mupen64plus-next after apt retroarch packages (needs network)."
+echo "Emulators: Calamares gamebian-web-install (set GAMEBIAN_LIVE_INCLUDE_EMULATORS=1 to bake into ISO)."
 echo "From here: cd $SCRIPT_ROOT && ./build.sh"

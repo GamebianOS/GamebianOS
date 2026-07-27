@@ -63,6 +63,7 @@ if [[ -n "${LB_LIVE_USER_PASSWORD:-}" ]]; then
   _bootappend="${_bootappend} user-password=${LB_LIVE_USER_PASSWORD}"
 fi
 _bootappend="${_bootappend} hostname=${GAMEBIAN_LIVE_HOSTNAME}"
+# Slim live ISO: no Recommends, xz squashfs max compression (target <2GB).
 lb config \
   --mode "$LB_MODE" \
   --distribution "$LB_DISTRIBUTION" \
@@ -81,6 +82,8 @@ lb config \
   --checksums sha256 \
   --debootstrap-options "--variant=minbase" \
   --debian-installer none \
+  --apt-recommends false \
+  --chroot-squashfs-compression-type xz \
   --binary-image iso-hybrid \
   --bootloaders "grub-pc grub-efi" \
   --bootappend-live "$_bootappend"
@@ -91,6 +94,11 @@ live-boot
 live-config
 live-config-systemd
 systemd-sysv
+# Explicit (not via Recommends): create live user for autologin
+user-setup
+live-tools
+locales
+keyboard-configuration
 EOF
   rm -rf "$BUILD_ROOT/config/includes.chroot_before_packages/etc/dracut.conf.d" 2>/dev/null || true
 fi
@@ -124,6 +132,13 @@ if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
 fi
 
+# Remove a stale unit from older build roots. It ran `systemctl start ssh.socket`
+# while ordered Before=ssh.socket, so systemd waited on itself during live boot.
+rm -f \
+  "$BUILD_ROOT/config/includes.chroot/lib/systemd/system/gamebian-live-sshd-boot.service" \
+  "$BUILD_ROOT/config/includes.chroot/usr/lib/systemd/system/gamebian-live-sshd-boot.service" \
+  "$BUILD_ROOT/config/includes.chroot/etc/systemd/system/multi-user.target.wants/gamebian-live-sshd-boot.service"
+
 if [[ -f "$METADATA/$GAMEBIAN_DISTRO_CONF" ]]; then
   mkdir -p "$BUILD_ROOT/config/includes.chroot/etc/gamebian"
   cp -a "$METADATA/$GAMEBIAN_DISTRO_CONF" \
@@ -139,12 +154,20 @@ if [[ -f "$ENSURE_APT_SRC" ]]; then
   chmod 0644 "$ENSURE_APT_DST"
 fi
 
-# RetroArch package names for post-install hook + Calamares (not live-build *.list.chroot — see 997 hook).
+# RetroArch package names for Calamares gamebian-web-install (not on slim live squashfs by default).
 RETRO_PKG_SRC="$SCRIPT_ROOT/../../Packages/gamebian-web/packaging/$GAMEBIAN_RETROARCH_LIST"
 RETRO_PKG_SHARE="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/$GAMEBIAN_RETROARCH_LIST"
 if [[ -f "$RETRO_PKG_SRC" ]]; then
   mkdir -p "$(dirname "$RETRO_PKG_SHARE")"
   cp -a "$RETRO_PKG_SRC" "$RETRO_PKG_SHARE"
+fi
+
+# gamescope-build package names for hook 997 purge after source-build fallback.
+GSCOPE_BUILD_LIST="$OVERLAY/package-lists/gamescope-build.list.chroot"
+GSCOPE_BUILD_SHARE="$BUILD_ROOT/config/includes.chroot/usr/share/gamebian/gamescope-build.list"
+if [[ -f "$GSCOPE_BUILD_LIST" ]]; then
+  mkdir -p "$(dirname "$GSCOPE_BUILD_SHARE")"
+  grep -v '^#' "$GSCOPE_BUILD_LIST" | grep -v '^[[:space:]]*$' > "$GSCOPE_BUILD_SHARE" || true
 fi
 
 # Controller menu: source lives under Build/share/gamebian/ (same path on ISO as before).
@@ -283,6 +306,7 @@ shopt -u nullglob
 
 echo "Configured: overlay merged into $BUILD_ROOT/config"
 echo "Artifacts (binary/, iso) go to: $BUILD_ROOT"
-echo "gamescope: hook 997 installs from Ubuntu apt (fallback: source build). Needs network for retroarch extras."
-echo "N64 core: hook 997 runs gamebian-install-libretro-mupen64plus-next after apt retroarch packages (needs network)."
+echo "Slim Ubuntu live ISO (<2GB): no Steam/i386, no Papirus, no RetroArch, no flatpak/Python web stack on squashfs."
+echo "gamescope: apt from universe (hook 997); build toolchain never in package-lists."
+echo "Deferred to Calamares: steam, papirus, emulators, flatpak + gamebian-web runtime."
 echo "From here: cd $SCRIPT_ROOT && ./build.sh"
