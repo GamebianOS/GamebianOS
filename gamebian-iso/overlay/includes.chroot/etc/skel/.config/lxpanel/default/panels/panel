@@ -72,6 +72,12 @@ Plugin {
 Plugin {
   type=volume
   Config {
+    UseAlsamixerVolumeMapping=1
+    MasterChannel=Master
+    MixerCommand=pavucontrol
+    MixerCommandTerm=0
+    SliderButton=2
+    MixerButton=1
   }
 }
 Plugin {

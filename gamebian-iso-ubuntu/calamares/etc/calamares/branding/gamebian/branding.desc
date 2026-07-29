@@ -24,8 +24,9 @@ sidebar: widget
 navigation: widget
 
 # Image files are produced by calamares/merge.sh from Build/images/:
-#   calamares/image.png      -> welcome.png (+ slide1.png for show.qml): main large pane
-#   calamares/user-icon.png  -> gamebian-logo.png: icon above sidebar step list (+ window icon)
+#   calamares/image.png       -> welcome.png (+ slide1.png for show.qml): main large pane
+#   calamares/user-icon.png   -> gamebian-logo.png: icon above sidebar step list (+ window icon)
+#   (user-login.png also accepted as an alias for user-icon.png)
 images:
     productLogo:         "gamebian-logo.png"
     productIcon:         "gamebian-logo.png"

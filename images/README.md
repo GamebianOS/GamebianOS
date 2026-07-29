@@ -18,7 +18,7 @@ cd Build/gamebian-iso-ubuntu
 
 | File | Used for |
 |------|----------|
-| `user-icon.png` | Calamares sidebar logo + window icon |
+| `user-icon.png` | Calamares sidebar logo + window icon (`user-login.png` also accepted) |
 | `image.png` | Calamares welcome screen + slideshow hero |
 
 ## live/

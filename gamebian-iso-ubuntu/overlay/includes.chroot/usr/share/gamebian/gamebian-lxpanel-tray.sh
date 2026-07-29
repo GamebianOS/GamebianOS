@@ -51,6 +51,7 @@ gamebian_wait_for_tray() {
 
 gamebian_stop_legacy_nm() {
 	pkill -x nm-tray 2>/dev/null || true
+	pkill -x nm-applet 2>/dev/null || true
 	pkill -f '[g]amebian-nm-status-icon.py' 2>/dev/null || true
 }
 
@@ -59,12 +60,17 @@ gamebian_start_nm_tray() {
 	if command -v gamebian_openbox_session_env >/dev/null 2>&1; then
 		gamebian_openbox_session_env
 	fi
-	export XDG_CURRENT_DESKTOP=LXDE
+	export XDG_CURRENT_DESKTOP=GNOME
 	if [ -x /usr/local/bin/gamebian-nm-tray ]; then
 		/usr/local/bin/gamebian-nm-tray >/dev/null 2>&1 &
 		return 0
 	fi
+	if command -v nm-applet >/dev/null 2>&1; then
+		nm-applet >/dev/null 2>&1 &
+		return 0
+	fi
 	if command -v nm-tray >/dev/null 2>&1; then
+		export XDG_CURRENT_DESKTOP=LXDE
 		nm-tray >/dev/null 2>&1 &
 	fi
 	return 0

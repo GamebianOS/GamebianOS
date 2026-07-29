@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=nm-tray
+Comment=Disabled — Gamebian starts nm-applet after lxpanel tray is ready
+TryExec=nm-tray
+Exec=nm-tray
+Hidden=true
+X-GNOME-Autostart-enabled=false
+NotShowIn=KDE;GNOME;LXDE;Openbox;

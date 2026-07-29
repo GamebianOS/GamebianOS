@@ -14,7 +14,8 @@ live-tools
 locales
 keyboard-configuration
 network-manager
-nm-tray
+# Tray: nm-applet (GTK) — same as SamStation; Qt nm-tray often invisible in lxpanel.
+network-manager-applet
 bluez
 blueman
 qt5-gtk-platformtheme

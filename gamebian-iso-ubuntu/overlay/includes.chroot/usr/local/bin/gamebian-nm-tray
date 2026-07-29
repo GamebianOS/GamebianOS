@@ -1,5 +1,6 @@
 #!/bin/sh
-# Network tray for lxpanel: GTK status icon on installed disk; Qt nm-tray on live ISO.
+# Network tray for lxpanel: GNOME nm-applet (GTK XEmbed) — same approach as SamStation.
+# Qt nm-tray frequently shows no icon / white squares in lxpanel's legacy tray.
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
@@ -10,14 +11,21 @@ if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
 	gamebian_openbox_session_env
 fi
 
-export XDG_CURRENT_DESKTOP=LXDE
+# nm-applet expects a GNOME-ish desktop id for icon lookup.
+export XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP:-GNOME}"
 
-if grep -qw boot=live /proc/cmdline 2>/dev/null; then
-	exec /usr/bin/nm-tray "$@"
+if command -v nm-applet >/dev/null 2>&1; then
+	exec nm-applet "$@"
 fi
 
+# Fallbacks if network-manager-applet is missing on an older image.
 if [ -x /usr/share/gamebian/gamebian-nm-status-icon.py ]; then
 	exec python3 /usr/share/gamebian/gamebian-nm-status-icon.py "$@"
 fi
 
-exec /usr/bin/nm-tray "$@"
+if command -v nm-tray >/dev/null 2>&1; then
+	export XDG_CURRENT_DESKTOP=LXDE
+	exec nm-tray "$@"
+fi
+
+exec nm-connection-editor "$@"

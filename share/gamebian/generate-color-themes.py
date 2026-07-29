@@ -242,6 +242,41 @@ calendar:selected {{
 calendar:indeterminate {{
   color: @insensitive_fg_color;
 }}
+
+/* GtkScale (lxpanel volume popup): visible trough + slider */
+scale {{
+  min-width: 14px;
+  min-height: 90px;
+  padding: 6px 4px;
+  color: @theme_fg_color;
+}}
+
+scale trough {{
+  background-color: @insensitive_bg_color;
+  border: 1px solid @borders;
+  border-radius: 4px;
+}}
+
+scale highlight {{
+  background-color: @theme_view_hover_color;
+}}
+
+scale slider {{
+  background-color: @theme_selected_fg_color;
+  border: 1px solid @theme_fg_color;
+  border-radius: 3px;
+  min-width: 18px;
+  min-height: 10px;
+}}
+
+scale.vertical slider {{
+  min-width: 18px;
+  min-height: 10px;
+}}
+
+scale slider:hover {{
+  background-color: @theme_fg_color;
+}}
 """
 
 

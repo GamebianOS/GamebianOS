@@ -13,8 +13,8 @@ live-tools
 locales
 keyboard-configuration
 network-manager
-# Tray: nm-tray (Qt); blueman-applet (GTK) for Bluetooth — start after lxpanel systray in autostart
-nm-tray
+# Tray: nm-applet (GTK) — same as SamStation; Qt nm-tray often invisible in lxpanel.
+network-manager-applet
 bluez
 blueman
 qt5-gtk-platformtheme
@@ -22,12 +22,12 @@ qt6-gtk-platformtheme
 qt6ct
 hicolor-icon-theme
 libqt5svg5
-# Standalone NM connection GUI (pairs with nm-tray — do not rely on applet metapackages)
+# Standalone NM connection GUI (pairs with nm-applet — do not rely on applet metapackages)
 nm-connection-editor
 # Graphical PolKit agent: without it, Wi‑Fi / NM prompts may not accept keyboard input under Openbox.
 # PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides GTK prompts for NM, etc.)
 mate-polkit
-# Secret service + PAM unlock: NM / nm-tray store Wi‑Fi PSKs reliably (avoids broken passphrase prompts).
+# Secret service + PAM unlock: NM / nm-applet store Wi‑Fi PSKs reliably (avoids broken passphrase prompts).
 gnome-keyring
 libpam-gnome-keyring
 iproute2

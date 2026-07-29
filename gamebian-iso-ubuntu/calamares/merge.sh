@@ -39,10 +39,12 @@ pick_welcome_image() {
 }
 
 pick_sidebar_logo() {
-  if [[ -f "$IMAGES/calamares/user-icon.png" ]]; then
+  # Icon above Welcome / Install type / … — do not fall back to image.png
+  # (that is the large welcome pane; mixing them up swaps branding).
+  if [[ -f "$IMAGES/calamares/user-login.png" ]]; then
+    echo "$IMAGES/calamares/user-login.png"
+  elif [[ -f "$IMAGES/calamares/user-icon.png" ]]; then
     echo "$IMAGES/calamares/user-icon.png"
-  elif [[ -f "$IMAGES/calamares/image.png" ]]; then
-    echo "$IMAGES/calamares/image.png"
   elif [[ -f "$IMAGES/icons/menu-icon.png" ]]; then
     echo "$IMAGES/icons/menu-icon.png"
   fi
@@ -53,7 +55,7 @@ if [[ -n "$_sidebar" ]]; then
   cp -a "$_sidebar" "$br/gamebian-logo.png"
   cp -a "$_sidebar" "$TARGET/usr/share/pixmaps/gamebian-console.png"
 elif [[ ! -f "$br/gamebian-logo.png" ]]; then
-  echo "calamares/merge.sh: warning: missing calamares user-icon (or fallback) under $IMAGES." >&2
+  echo "calamares/merge.sh: warning: missing calamares user-login.png or user-icon.png under $IMAGES." >&2
 fi
 
 _welcome_large="$(pick_welcome_image)"

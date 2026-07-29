@@ -5,7 +5,7 @@ if [ -r /usr/share/gamebian/gamebian-display-resolution.sh ]; then
 	. /usr/share/gamebian/gamebian-display-resolution.sh
 	gamebian_ensure_native_resolution 2>/dev/null || true
 fi
-# GTK_THEME + GTK_ICON_THEME before lxpanel (nm-tray / blueman need Papirus-Dark on dark panel).
+# GTK_THEME + GTK_ICON_THEME before lxpanel (nm-applet / blueman need a panel icon theme).
 if [ -r /usr/share/gamebian/gamebian-openbox-session-env.sh ]; then
 	# shellcheck source=/usr/share/gamebian/gamebian-openbox-session-env.sh
 	. /usr/share/gamebian/gamebian-openbox-session-env.sh
@@ -64,13 +64,14 @@ else
 fi
 if ! grep -qw boot=live /proc/cmdline 2>/dev/null && pgrep -x lxpanel >/dev/null 2>&1; then
 	pkill -x nm-tray 2>/dev/null || true
+	pkill -x nm-applet 2>/dev/null || true
 	pkill -f '[b]lueman-applet' 2>/dev/null || true
 	pkill -x lxpanel 2>/dev/null || true
 	sleep 0.15
 fi
 lxpanel &
 
-# nm-tray + blueman + Steam systray: wait for lxpanel tray plugin (see gamebian-lxpanel-tray.sh).
+# nm-applet + blueman + Steam systray: wait for lxpanel tray plugin (see gamebian-lxpanel-tray.sh).
 if [ -x /usr/share/gamebian/gamebian-lxpanel-tray.sh ]; then
 	/usr/share/gamebian/gamebian-lxpanel-tray.sh &
 fi
