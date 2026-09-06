@@ -76,6 +76,8 @@ pavucontrol
 
 # gamescope runtime helper (binary from hook 997 source build; toolchain purged after).
 xwayland
+# RADV/ANV (not a Recommends of xserver-xorg). gamescope needs this or it only sees llvmpipe.
+mesa-vulkan-drivers
 # gamescope: built from source (gamescope-build.list.chroot + hook 997); not a trixie .deb.
 # Steam: Calamares packages.conf + gamebian-install-steam (not on live squashfs).
 

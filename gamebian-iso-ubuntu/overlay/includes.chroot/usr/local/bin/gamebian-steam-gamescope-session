@@ -137,9 +137,11 @@ while :; do
 
 	if [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
 		gamebian_handoff_to_openbox_desktop
+		continue
 	fi
-	break
+	# Steam/gamescope died — keep a desktop instead of dropping to the LightDM greeter.
+	printf '%s gamescope-session: kiosk exited (%s) — Openbox fallback\n' \
+		"$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)" "${_rc}" >>"$_log" 2>/dev/null || true
+	gamebian_kiosk_marker_clear 2>/dev/null || true
+	exec /usr/bin/openbox-session
 done
-
-gamebian_kiosk_marker_clear 2>/dev/null || true
-exit "${_rc}"

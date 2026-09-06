@@ -15,8 +15,22 @@ _steam_ok() {
 		|| [ -x /usr/bin/steam ]
 }
 
+_install_vulkan_drivers() {
+	# Slim ISO disables APT Recommends — pull RADV/ANV for gamescope (and i386 for Steam).
+	apt-get install -y mesa-vulkan-drivers mesa-vulkan-drivers:i386 2>/dev/null \
+		|| apt-get install -y mesa-vulkan-drivers || true
+}
+
 if _steam_ok; then
 	echo "Steam already installed: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
+	if [ -r /usr/share/gamebian/ensure-apt-contrib-nonfree.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/ensure-apt-contrib-nonfree.sh
+		ensure_apt_i386
+		ensure_apt_contrib_nonfree
+	fi
+	apt-get update
+	_install_vulkan_drivers
 	exit 0
 fi
 
@@ -36,6 +50,7 @@ if [ -r /usr/share/gamebian/ensure-apt-contrib-nonfree.sh ]; then
 fi
 
 apt-get update
+_install_vulkan_drivers
 apt-get install -y steam-installer
 
 if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then

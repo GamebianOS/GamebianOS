@@ -209,9 +209,9 @@ case "${STEAM_BIGPICTURE_UI:-gamepad}" in
 esac
 
 # Under gamescope, Steam uses the SteamOS power menu and expects steamos-session-select for
-# "Switch to Desktop". -steamos3 wires that path (steam-for-linux #11241 / #11749). Applies to
-# LightDM kiosk and nested gamescope from Openbox when running Big Picture modes.
-# Opt out entirely: GAMEBIAN_STEAM_NO_STEAMOS3=1 in steam-gamescope.env or the environment.
+# "Switch to Desktop". -steamos3 switches the client to steamdeck_stable (needs a download).
+# Only pass it when gamescope is actually used — otherwise Steam dies with
+# "needs to be online to update" if the Deck client is not cached yet.
 _steam_extras=""
 case "${GAMEBIAN_STEAM_NO_STEAMOS3:-}" in
 	1|yes|true|YES|TRUE) ;;
@@ -219,14 +219,39 @@ case "${GAMEBIAN_STEAM_NO_STEAMOS3:-}" in
 		case "${STEAM_BIGPICTURE_UI:-gamepad}" in
 			plain|desktop) ;;
 			*)
-				if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-					|| { [ "$_use_gamescope" -eq 1 ] && [ -n "${_steam_modes}" ]; }; then
+				if [ "$_use_gamescope" -eq 1 ]; then
 					_steam_extras="-steamos3"
 				fi
 				;;
 		esac
 		;;
 esac
+
+# Autologin often starts before NetworkManager is online. Steam's first Deck/client
+# update treats that as fatal ("http error 0") and the session drops to the greeter.
+gamebian_wait_for_network() {
+	case "${GAMEBIAN_SKIP_NETWORK_WAIT:-}" in
+		1|yes|true|YES|TRUE) return 0 ;;
+	esac
+	if [ -z "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
+		return 0
+	fi
+	if command -v nm-online >/dev/null 2>&1; then
+		log "waiting for network (nm-online)"
+		nm-online -q -t 60 || log "nm-online timed out — continuing"
+		return 0
+	fi
+	_i=0
+	while [ "${_i}" -lt 30 ]; do
+		if ping -c1 -W1 1.1.1.1 >/dev/null 2>&1 \
+			|| ping -c1 -W1 9.9.9.9 >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 1
+		_i=$((_i + 1))
+	done
+	log "network wait timed out — continuing"
+}
 
 log "gamescope=${GAMESCOPE_BIN:-none} steam=$STEAM_BIN use_gamescope=$_use_gamescope session=${GAMEBIAN_GAMESCOPE_SESSION:-0} DISPLAY=${DISPLAY:-unset} embed=${_EMBED_UNDER_X:-none} fullscreen=${FULLSCREEN:-} wh=${_GAMESCOPE_WH:-unset} game_wh=${_GAMESCOPE_GAME_WH:-unset} refresh=${_GAMESCOPE_REFRESH:-unset} hide_cursor=${_GAMESCOPE_HIDE_CURSOR:-off} steamos3=${_steam_extras:-none} VK_ICD_FILENAMES=${GAMEBIAN_VK_ICD_FILENAMES:-default} extra_args=${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-none}"
 
@@ -325,6 +350,7 @@ _steam_direct() {
 _launch() {
 	_rc=1
 	_gamescope_tried=0
+	gamebian_wait_for_network
 	if [ "$_use_gamescope" -eq 1 ]; then
 		_gamescope_tried=1
 		if _run_gamescope "$_steam_mode"; then
@@ -342,6 +368,7 @@ _launch() {
 		if [ "${_gamescope_tried}" -eq 1 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 			log "kiosk: gamescope unavailable — starting Steam on X once (no relaunch loop; GAMEBIAN_SKIP_GAMESCOPE=1 in steam-gamescope.env to skip gamescope)"
 			_use_gamescope=0
+			_steam_extras=""
 		fi
 	fi
 	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then

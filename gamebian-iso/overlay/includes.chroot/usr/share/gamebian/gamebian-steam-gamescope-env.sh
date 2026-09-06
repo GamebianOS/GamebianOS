@@ -35,19 +35,16 @@ gamebian_clear_steam_without_gamescope_markers() {
 	case "${GAMEBIAN_SKIP_GAMESCOPE:-}" in
 		1|yes|true|YES|TRUE) return 0 ;;
 	esac
-	if [ -f /etc/gamebian/steam-without-gamescope ] \
-		|| [ -f "${HOME}/.config/gamebian/steam-without-gamescope" ]; then
-		return 0
-	fi
 	if [ -r /usr/share/gamebian/gamebian-steam-ready.sh ]; then
 		# shellcheck disable=SC1091
 		. /usr/share/gamebian/gamebian-steam-ready.sh
 	fi
-	# --help is not enough (VM / llvmpipe: VK_EXT_physical_device_drm missing).
+	# Probe even when a skip marker exists — missing Vulkan/render group was a
+	# one-shot failure that used to stick forever (rm below was unreachable).
 	if command -v gamebian_gamescope_binary_works >/dev/null 2>&1 \
 		&& gamebian_gamescope_binary_works 2>/dev/null \
 		&& command -v gamescope >/dev/null 2>&1 \
-		&& DISPLAY="${DISPLAY:-:0}" timeout 3 gamescope -- true >/dev/null 2>&1; then
+		&& DISPLAY="${DISPLAY:-:0}" timeout 5 gamescope -- true >/dev/null 2>&1; then
 		rm -f /etc/gamebian/steam-without-gamescope \
 			"${HOME}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
 	fi

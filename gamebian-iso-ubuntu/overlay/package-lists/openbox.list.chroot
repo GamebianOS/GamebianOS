@@ -66,6 +66,8 @@ pavucontrol
 # gamescope from Ubuntu universe — needed after unpack onto disk; small vs Steam/emulators.
 gamescope
 xwayland
+# RADV/ANV (not a Recommends of xserver-xorg). gamescope needs this or it only sees llvmpipe.
+mesa-vulkan-drivers
 
 calamares
 # Calamares unpackfs needs unsquashfs — only a Recommends of calamares.
