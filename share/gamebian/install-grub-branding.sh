@@ -167,17 +167,26 @@ if [[ -z "$GRUB16" ]]; then
 fi
 GRUB43="$(pick_grub_4x3 || true)"
 
-install_bootloader "$OVERLAY/bootloaders/grub-pc"
-install_bootloader "$OVERLAY/bootloaders/grub-efi"
-install_isolinux_splash "$OVERLAY/bootloaders/isolinux" "${GRUB43:-$GRUB16}"
-install_installed_branding "$OVERLAY"
+# The overlay is a git-tracked source tree: regenerating artwork there shows up
+# as dirty blobs on every build (and a missing ImageMagick silently commits an
+# unresized splash). Write it only when explicitly asked to refresh the recipe.
+if [[ "${GAMEBIAN_WRITE_REPO_OVERLAY:-0}" == "1" ]]; then
+  install_bootloader "$OVERLAY/bootloaders/grub-pc"
+  install_bootloader "$OVERLAY/bootloaders/grub-efi"
+  install_isolinux_splash "$OVERLAY/bootloaders/isolinux" "${GRUB43:-$GRUB16}"
+  install_installed_branding "$OVERLAY"
+fi
 
+# Live-build config tree (setup.sh passes BUILD_ROOT/config).
 if [[ -n "${1:-}" ]]; then
   _cfg="${1%/}"
   install_bootloader "$_cfg/bootloaders/grub-pc"
   install_bootloader "$_cfg/bootloaders/grub-efi"
   install_isolinux_splash "$_cfg/bootloaders/isolinux" "${GRUB43:-$GRUB16}"
   install_installed_branding "$_cfg"
+elif [[ "${GAMEBIAN_WRITE_REPO_OVERLAY:-0}" != "1" ]]; then
+  echo "install-grub-branding: skipped repo overlay (pass live-build config dir as \$1)." >&2
+  exit 1
 fi
 
 echo "install-grub-branding: OK ($GRUB16 → live USB isolinux + GRUB + installed branding)"

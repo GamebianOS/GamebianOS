@@ -30,20 +30,37 @@ if ! command -v lb >/dev/null 2>&1; then
 fi
 
 # Building Ubuntu on a Debian host requires Ubuntu's archive signing key for debootstrap.
-ensure_ubuntu_archive_keyring() {
-  [[ -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ]] && return 0
-  echo "Missing Ubuntu archive keyring — needed to debootstrap resolute on Debian."
+# Unpack only ubuntu-keyring — `apt-get install` also configures every pending
+# host package (e.g. a backports kernel + NVIDIA DKMS) and can fail unrelated.
+_run_root() {
   if [[ "$(id -u)" -eq 0 ]]; then
-    apt-get update -qq
-    apt-get install -y ubuntu-keyring
+    "$@"
   elif command -v sudo >/dev/null 2>&1; then
-    sudo apt-get update -qq
-    sudo apt-get install -y ubuntu-keyring
+    sudo "$@"
   else
     echo "ERROR: install ubuntu-keyring on the build host:" >&2
     echo "  sudo apt install ubuntu-keyring" >&2
     exit 1
   fi
+}
+
+ensure_ubuntu_archive_keyring() {
+  if [[ -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ]]; then
+    return 0
+  fi
+  echo "Missing Ubuntu archive keyring — needed to debootstrap resolute on Debian."
+  local tmp
+  tmp="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmp'" RETURN
+  (
+    set -euo pipefail
+    cd "$tmp"
+    _run_root apt-get update -qq
+    apt-get download ubuntu-keyring
+    _run_root dpkg --unpack ./ubuntu-keyring_*.deb
+    _run_root dpkg --configure ubuntu-keyring
+  )
   if [[ ! -f /usr/share/keyrings/ubuntu-archive-keyring.gpg ]]; then
     echo "ERROR: ubuntu-keyring installed but keyring still missing" >&2
     exit 1
