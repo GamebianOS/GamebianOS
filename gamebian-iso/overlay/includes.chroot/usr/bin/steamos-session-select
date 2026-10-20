@@ -1,32 +1,34 @@
 #!/bin/sh
-# Steam gamepad / Big Picture session switch (SteamOS API on non-SteamOS distros).
-# "desktop" → Openbox under LightDM; "gamescope" → kiosk now (if DISPLAY set) + next boot.
+# SteamOS session-select shim. Gamebian has no desktop session.
+# "desktop" is a no-op so Steam's Switch to Desktop does not leave gamescope.
+# "gamescope" keeps the gaming session (already the only installed session).
 
 PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games${PATH:+:$PATH}"
 export PATH
 
 _mode="${1:-desktop}"
+_log="${XDG_CACHE_HOME:-${HOME}/.cache}/gamebian/session-select.log"
+mkdir -p "$(dirname "$_log")" 2>/dev/null || true
+_ts="$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date)"
 
 case "${_mode}" in
 	desktop|openbox|plasma|gnome|xfce)
-		exec /usr/sbin/gamebian-steam-switch-to-desktop
+		printf '%s steamos-session-select: no desktop session (%s)\n' "$_ts" "${_mode}" >>"$_log" 2>/dev/null || true
+		echo "Gamebian has no desktop session." >&2
+		exit 0
 		;;
 	gamescope|steam|gaming|gamebian-steam-gamescope)
-		if command -v sudo >/dev/null 2>&1 \
-			&& sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null; then
-			:
-		elif command -v sudo >/dev/null 2>&1; then
-			sudo /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
+		rm -f "${HOME}/.config/gamebian/switch-to-openbox" \
+			"${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
+		if command -v sudo >/dev/null 2>&1; then
+			sudo -n /usr/sbin/gamebian-enable-steam-lightdm-session 2>/dev/null || true
 		fi
-		rm -f "${HOME}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
-		rm -f "${HOME}/.config/gamebian/prefer-openbox-desktop" 2>/dev/null || true
-		if [ -n "${DISPLAY:-}" ] \
-			&& [ -x /usr/sbin/gamebian-enter-steam-kiosk-session ]; then
-			exec /usr/sbin/gamebian-enter-steam-kiosk-session
-		fi
+		printf '%s steamos-session-select: stay on gamescope\n' "$_ts" >>"$_log" 2>/dev/null || true
 		exit 0
 		;;
 	*)
-		exec /usr/sbin/gamebian-steam-switch-to-desktop
+		printf '%s steamos-session-select: no desktop session (%s)\n' "$_ts" "${_mode}" >>"$_log" 2>/dev/null || true
+		echo "Gamebian has no desktop session." >&2
+		exit 0
 		;;
 esac

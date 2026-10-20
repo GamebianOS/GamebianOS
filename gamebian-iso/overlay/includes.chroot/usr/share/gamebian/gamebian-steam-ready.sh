@@ -1,5 +1,5 @@
 # shellcheck shell=sh
-# Shared Steam install / setup checks (Openbox autostart, gamescope session, notices).
+# Shared Steam install / setup checks (gamescope session).
 
 gamebian_have_loginusers_vdf_for_home() {
 	_home="$1"
@@ -78,12 +78,10 @@ gamebian_steam_logged_in() {
 	gamebian_have_loginusers_vdf
 }
 
-# LightDM autologin → gamescope when Steam is installed and the user is signed in.
+# LightDM autologin → gamescope when the Steam client payload is on disk.
+# Account sign-in (loginusers.vdf) happens inside Steam under gamescope.
 gamebian_steam_kiosk_ready() {
-	if ! gamebian_steam_client_installed; then
-		return 1
-	fi
-	gamebian_steam_logged_in
+	gamebian_steam_client_installed
 }
 
 gamebian_steam_install_idle() {
@@ -91,12 +89,6 @@ gamebian_steam_install_idle() {
 }
 
 gamebian_finish_steam_firstboot() {
-	if gamebian_steam_kiosk_ready; then
-		return 0
-	fi
-	if ! gamebian_have_loginusers_vdf; then
-		return 1
-	fi
 	if [ "$(id -u)" -eq 0 ]; then
 		/usr/sbin/gamebian-enable-steam-lightdm-session || return 1
 	elif command -v sudo >/dev/null 2>&1; then

@@ -1,5 +1,6 @@
 #!/bin/sh
-# Install Steam on amd64 (Ubuntu multiverse: steam-installer on 26.04+, steam on older releases).
+# Install Steam on amd64 (Ubuntu multiverse: steam-installer on 26.04+, steam on older releases),
+# then bootstrap the Steam client into the installed user's home.
 set -eu
 
 export DEBIAN_FRONTEND=noninteractive
@@ -9,10 +10,27 @@ if [ "$(id -u)" -ne 0 ]; then
 	exec sudo "$0" "$@"
 fi
 
+_log="/var/log/gamebian-install-steam.log"
+mkdir -p /var/log
+
+_say() {
+	printf '%s\n' "$*" | tee -a "${_log}"
+}
+
 _steam_ok() {
 	command -v steam >/dev/null 2>&1 \
 		|| [ -x /usr/games/steam ] \
 		|| [ -x /usr/bin/steam ]
+}
+
+_steam_launcher() {
+	for _c in /usr/games/steam /usr/bin/steam /usr/local/bin/steam; do
+		if [ -x "${_c}" ]; then
+			printf '%s\n' "${_c}"
+			return 0
+		fi
+	done
+	command -v steam 2>/dev/null || return 1
 }
 
 _install_vulkan_drivers() {
@@ -21,8 +39,124 @@ _install_vulkan_drivers() {
 		|| apt-get install -y mesa-vulkan-drivers || true
 }
 
+# True when the client payload is unpacked and the launcher is not mid-bootstrap.
+_steam_client_ready_for_home() {
+	_home="$1"
+	[ -n "${_home}" ] || return 1
+	if [ -f "${_home}/.steam/steam/.needs-steam-bootstrap" ] \
+		|| [ -f "${_home}/.steam/debian-installation/.needs-steam-bootstrap" ] \
+		|| [ -f "${_home}/.steam/root/.needs-steam-bootstrap" ]; then
+		return 1
+	fi
+	[ -f "${_home}/.steam/steam/ubuntu12_32/steam" ] \
+		|| [ -f "${_home}/.steam/debian-installation/ubuntu12_32/steam" ] \
+		|| [ -f "${_home}/.local/share/Steam/ubuntu12_32/steam" ] \
+		|| [ -x "${_home}/.steam/steam/steam.sh" ] \
+		|| [ -x "${_home}/.steam/debian-installation/steam.sh" ] \
+		|| [ -x "${_home}/.local/share/Steam/steam.sh" ]
+}
+
+_stop_user_steam() {
+	_user="$1"
+	[ -n "${_user}" ] || return 0
+	pkill -u "${_user}" -TERM -x steam 2>/dev/null || true
+	pkill -u "${_user}" -TERM -x steam.sh 2>/dev/null || true
+	pkill -u "${_user}" -TERM -x Xvfb 2>/dev/null || true
+	pkill -u "${_user}" -TERM -f '[x]vfb-run' 2>/dev/null || true
+	sleep 1
+	pkill -u "${_user}" -KILL -x steam 2>/dev/null || true
+	pkill -u "${_user}" -KILL -x steam.sh 2>/dev/null || true
+	pkill -u "${_user}" -KILL -x Xvfb 2>/dev/null || true
+	pkill -u "${_user}" -KILL -f '[x]vfb-run' 2>/dev/null || true
+}
+
+# Download the Steam client as the Calamares user. Account login is left to
+# the gamescope session. Failure is non-fatal: first boot can finish the update.
+_bootstrap_steam_client() {
+	_launcher="$(_steam_launcher 2>/dev/null || true)"
+	if [ -z "${_launcher}" ]; then
+		_say "bootstrap: steam launcher missing; skipping client download"
+		return 1
+	fi
+
+	_user=""
+	_home=""
+	if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
+		# shellcheck disable=SC1091
+		. /usr/share/gamebian/gamebian-lightdm-user.sh
+		_user="$(gamebian_lightdm_autologin_user 2>/dev/null || true)"
+		_home="$(gamebian_lightdm_user_home 2>/dev/null || true)"
+	fi
+	case "${_user}" in
+		""|root|live)
+			_say "bootstrap: no installed user (got '${_user:-none}'); Steam will update on first gamescope launch"
+			return 0
+			;;
+	esac
+	if [ -z "${_home}" ] || [ ! -d "${_home}" ]; then
+		_say "bootstrap: home missing for ${_user}; Steam will update on first gamescope launch"
+		return 0
+	fi
+	if _steam_client_ready_for_home "${_home}"; then
+		_say "bootstrap: Steam client already present in ${_home}"
+		return 0
+	fi
+
+	if ! command -v xvfb-run >/dev/null 2>&1; then
+		_say "bootstrap: installing xvfb"
+		apt-get install -y xvfb >>"${_log}" 2>&1 || {
+			_say "bootstrap: xvfb install failed; Steam will update on first gamescope launch"
+			return 1
+		}
+	fi
+
+	_uid="$(id -u "${_user}")"
+	_runtime="/run/user/${_uid}"
+	install -d -m 700 -o "${_user}" -g "${_user}" "${_runtime}" 2>/dev/null || true
+
+	_say "bootstrap: running ${_launcher} as ${_user} (up to 600s)"
+	# Bounded so this stays inside Calamares shellprocess@gamebian-sshprep (1800s).
+	runuser -u "${_user}" -- env \
+		HOME="${_home}" \
+		USER="${_user}" \
+		LOGNAME="${_user}" \
+		XDG_RUNTIME_DIR="${_runtime}" \
+		PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games" \
+		xvfb-run -a -s "-screen 0 1280x720x24" \
+		"${_launcher}" -silent >>"${_log}" 2>&1 &
+	_pid=$!
+
+	_start="$(date +%s)"
+	_limit=600
+	while :; do
+		if _steam_client_ready_for_home "${_home}"; then
+			_say "bootstrap: Steam client ready in ${_home}"
+			_stop_user_steam "${_user}"
+			wait "${_pid}" 2>/dev/null || true
+			return 0
+		fi
+		if ! kill -0 "${_pid}" 2>/dev/null; then
+			wait "${_pid}" 2>/dev/null || true
+			if _steam_client_ready_for_home "${_home}"; then
+				_say "bootstrap: Steam client ready in ${_home}"
+				return 0
+			fi
+			_say "bootstrap: launcher exited before the client payload was ready"
+			return 1
+		fi
+		_now="$(date +%s)"
+		if [ $((_now - _start)) -ge "${_limit}" ]; then
+			_say "bootstrap: timed out after ${_limit}s; gamescope will finish the Steam update"
+			_stop_user_steam "${_user}"
+			wait "${_pid}" 2>/dev/null || true
+			return 1
+		fi
+		sleep 5
+	done
+}
+
 if _steam_ok; then
-	echo "Steam already installed: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
+	_say "Steam already installed: $(command -v steam 2>/dev/null || echo /usr/games/steam)"
 	if [ -r /usr/share/gamebian/ensure-apt-gaming-repos.sh ]; then
 		# shellcheck disable=SC1091
 		. /usr/share/gamebian/ensure-apt-gaming-repos.sh
@@ -31,6 +165,7 @@ if _steam_ok; then
 	fi
 	apt-get update
 	_install_vulkan_drivers
+	_bootstrap_steam_client || _say "bootstrap incomplete; first gamescope boot will finish Steam setup"
 	exit 0
 fi
 
@@ -49,7 +184,7 @@ if apt-cache show steam-installer >/dev/null 2>&1; then
 elif apt-cache show steam >/dev/null 2>&1; then
 	_steam_pkg=steam
 else
-	echo "Neither steam-installer nor steam is available in apt (enable multiverse + i386)." >&2
+	_say "Neither steam-installer nor steam is available in apt (enable multiverse + i386)."
 	exit 1
 fi
 apt-get install -y "${_steam_pkg}"
@@ -59,9 +194,10 @@ if [ -x /usr/games/steam ] && [ ! -e /usr/bin/steam ]; then
 fi
 
 if _steam_ok; then
-	echo "OK: $(command -v steam 2>/dev/null || echo /usr/games/steam) (via ${_steam_pkg})"
+	_say "OK: $(command -v steam 2>/dev/null || echo /usr/games/steam) (via ${_steam_pkg})"
+	_bootstrap_steam_client || _say "bootstrap incomplete; first gamescope boot will finish Steam setup"
 	exit 0
 fi
 
-echo "${_steam_pkg} finished but steam binary not found" >&2
+_say "${_steam_pkg} finished but steam binary not found"
 exit 1

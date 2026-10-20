@@ -1,7 +1,6 @@
-# Minimal live ISO desktop (<2GB target).
-# Deferred to Calamares / first boot (not needed to try or install):
-#   steam-installer, steam-devices, epiphany, extra icon themes, RetroArch/emulators, flatpak
-# See packages.conf + gamebian-web-install + gamebian-install-steam.
+# Live installer image. Openbox is only a window for Calamares and is removed
+# from the installed disk (packages.conf). No panel, file manager, or terminal.
+# Steam is installed by Calamares (packages.conf + gamebian-install-steam).
 
 sudo
 systemd-sysv
@@ -13,21 +12,11 @@ live-tools
 locales
 keyboard-configuration
 network-manager
-# Tray: nm-applet (GTK) — same as SamStation; Qt nm-tray often invisible in lxpanel.
-network-manager-applet
-bluez
-blueman
-qt5-gtk-platformtheme
-qt6-gtk-platformtheme
-qt6ct
-hicolor-icon-theme
-libqt5svg5
-# Standalone NM connection GUI (pairs with nm-applet — do not rely on applet metapackages)
+# Standalone Wi-Fi dialog for the live installer (removed from the installed disk).
 nm-connection-editor
-# Graphical PolKit agent: without it, Wi‑Fi / NM prompts may not accept keyboard input under Openbox.
-# PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides GTK prompts for NM, etc.)
+# PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides prompts).
 mate-polkit
-# Secret service + PAM unlock: NM / nm-applet store Wi‑Fi PSKs reliably (avoids broken passphrase prompts).
+# Secret service + PAM unlock so NetworkManager can store Wi-Fi PSKs.
 gnome-keyring
 libpam-gnome-keyring
 iproute2
@@ -38,48 +27,23 @@ openssh-server
 rsync
 vim
 x11-utils
-zenity
-libnotify-bin
-# Desktop notifications without a GNOME/KDE shell (notify-send needs a dbus service)
-xfce4-notifyd
+hicolor-icon-theme
 
-# Default icon theme only (Papirus in skel GTK settings). Extra themes bloat the squashfs.
-papirus-icon-theme
-
-# Display manager + Openbox session (exact Gamebian desktop stack)
+# Display manager. Openbox hosts Calamares on the live ISO only.
 lightdm
 lightdm-gtk-greeter
 # LightDM only Recommends xserver-xorg — required explicitly with --apt-recommends false.
-# Without it the live ISO boots to getty (TTY) and Calamares never starts.
 xserver-xorg
-desktop-base
-
 openbox
+
 python3
-python3-gi
-python3-evdev
-python3-tk
-gir1.2-nm-1.0
-lxappearance
-lxappearance-obconf
-# X11 resolution / monitor mode picker (RandR); pairs with Openbox on Gamebian.
-lxrandr
-# xrandr CLI (gamescope kiosk probes native WxH via xrandr)
+# xrandr CLI (gamescope probes native WxH via xrandr)
 x11-xserver-utils
-lxpanel
-rofi
-feh
-thunar
-xfce4-terminal
-# Audio mixer GUI (outputs, per-app levels); works with PipeWire via Pulse compatibility.
-pavucontrol
 
 # gamescope runtime helper (binary from hook 997 source build; toolchain purged after).
 xwayland
 # RADV/ANV (not a Recommends of xserver-xorg). gamescope needs this or it only sees llvmpipe.
 mesa-vulkan-drivers
-# gamescope: built from source (gamescope-build.list.chroot + hook 997); not a trixie .deb.
-# Steam: Calamares packages.conf + gamebian-install-steam (not on live squashfs).
 
 # Installer (removed from disk install via Calamares packages module + autoremove)
 calamares
@@ -87,7 +51,6 @@ calamares-settings-debian
 # Calamares unpackfs needs unsquashfs — only a Recommends of calamares.
 squashfs-tools
 # Calamares partition/format — not pulled with --apt-recommends false.
-# Without e2fsprogs, erase-disk install fails creating the ext4 filesystem.
 e2fsprogs
 dosfstools
 parted

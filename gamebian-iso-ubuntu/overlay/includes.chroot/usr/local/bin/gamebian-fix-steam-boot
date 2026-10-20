@@ -50,21 +50,19 @@ if [ -r /usr/share/gamebian/gamebian-lightdm-user.sh ]; then
 			|| [ -f "${_home}/.local/share/Steam/config/loginusers.vdf" ]; then
 			_steam_signed_in=1
 		fi
-		if [ "${_steam_installed}" -eq 1 ] && [ "${_steam_signed_in}" -eq 1 ]; then
-			: >"${_home}/.config/gamebian-firstboot-steam.done"
-			touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
-			chown "${_u}:${_u}" "${_home}/.config/gamebian-firstboot-steam.done" \
-				"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
-			echo "Marked Steam ready for user ${_u} (signed in)"
+		: >"${_home}/.config/gamebian-firstboot-steam.done"
+		touch "${_home}/.config/gamebian-firstboot-steam.run-finished"
+		chown "${_u}:${_u}" "${_home}/.config/gamebian-firstboot-steam.done" \
+			"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
+		rm -f "${_home}/.config/gamebian/prefer-openbox-desktop" \
+			"${_home}/.config/gamebian/switch-to-openbox" 2>/dev/null || true
+		if [ "${_steam_installed}" -eq 0 ]; then
+			echo "User ${_u}: Steam launcher is not installed yet."
+			echo "  sudo gamebian-install-steam"
+		elif [ "${_steam_signed_in}" -eq 0 ]; then
+			echo "User ${_u}: Steam client present; sign in inside the gamescope session."
 		else
-			rm -f "${_home}/.config/gamebian-firstboot-steam.done" \
-				"${_home}/.config/gamebian-firstboot-steam.run-finished" 2>/dev/null || true
-			if [ "${_steam_installed}" -eq 0 ]; then
-				echo "User ${_u}: Steam is not fully installed — autologin stays on Openbox"
-			else
-				echo "User ${_u} is not signed in to Steam yet — autologin stays on Openbox"
-			fi
-			echo "  Sign in via the Steam setup terminal, then reboot."
+			echo "User ${_u}: Steam is installed and signed in."
 		fi
 	fi
 fi
@@ -72,11 +70,11 @@ fi
 echo ""
 echo "gamescope: $(command -v gamescope 2>/dev/null || echo NOT INSTALLED)"
 if ! command -v gamescope >/dev/null 2>&1; then
-	echo "Install gamescope (Ubuntu universe — required for Steam session):"
+	echo "Install gamescope (Debian contrib — required for Steam session):"
 	echo "  sudo gamebian-install-gamescope"
 fi
 echo ""
 echo "LightDM session config:"
 grep -hE '^(autologin-session|user-session|autologin-user)=' /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null | sort || true
 echo ""
-echo "Reboot after Steam is installed and signed in. Autologin uses gamescope only then."
+echo "Reboot into the gamescope session. Sign in to Steam there if you have not already."

@@ -1,9 +1,8 @@
 #!/bin/sh
-# Launch Steam Big Picture inside gamescope on the current X display (LightDM session or nested under Openbox).
+# Launch Steam Big Picture inside gamescope on the current X display (LightDM gamescope session).
 # -e: embed under host X11; -f: fullscreen that window (deck-like; not a small decor window).
-# Quitting Steam exits gamescope; under Openbox you return to the desktop. Under LightDM’s
-# gamebian-steam-gamescope session, Power → Switch to Desktop runs steamos-session-select → Openbox
-# (same LightDM login; autologin reset to openbox). Opt out of -steamos3: GAMEBIAN_STEAM_NO_STEAMOS3=1.
+# Quitting Steam exits gamescope; the LightDM session restarts it. There is no desktop session.
+# Opt out of -steamos3: GAMEBIAN_STEAM_NO_STEAMOS3=1.
 # Set GAMEBIAN_GAMESCOPE_WINDOWED=1 to drop -f (debug / windowed).
 # Set GAMEBIAN_SKIP_GAMESCOPE=1 to skip gamescope (VMs without Vulkan DRM / llvmpipe).
 # -e (--steam) enables gamescope Steam integration (steamcompmgr input routing). Required for
@@ -72,18 +71,8 @@ GAMESCOPE_BIN="$(find_bin gamescope /usr/games/gamescope /usr/bin/gamescope /usr
 STEAM_BIN="$(find_bin steam /usr/games/steam /usr/bin/steam /usr/local/bin/steam)" || STEAM_BIN=""
 
 if [ -z "$STEAM_BIN" ]; then
-	log "steam not on PATH — need first-boot setup"
-	if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-		exec /usr/bin/openbox-session
-	fi
+	log "steam launcher missing — not starting a desktop"
 	exit 1
-fi
-
-# Kiosk autologin requires a Steam account sign-in (loginusers.vdf).
-if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-	&& ! gamebian_steam_kiosk_ready 2>/dev/null; then
-	log "Steam not signed in; switching to Openbox setup"
-	exec /usr/bin/openbox-session
 fi
 
 _use_gamescope=1
@@ -315,18 +304,6 @@ _run_gamescope() {
 	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_GAMESCOPE_HIDE_CURSOR $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
 	_gs_pid=$!
 	_rc=0
-	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
-	while kill -0 "$_gs_pid" 2>/dev/null; do
-		if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] && [ -f "${_handoff}" ]; then
-			log "Switch to Desktop: stopping gamescope kiosk (pid ${_gs_pid})"
-			gamebian_stop_gamescope_pid "$_gs_pid"
-			if command -v gamebian_kill_steam_kiosk_tree >/dev/null 2>&1; then
-				gamebian_kill_steam_kiosk_tree
-			fi
-			return 0
-		fi
-		sleep 0.25
-	done
 	wait "$_gs_pid" 2>/dev/null || _rc=$?
 	# gamescope can exit 0 immediately when a second instance races the first.
 	if [ "${_rc}" -eq 0 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
@@ -361,10 +338,6 @@ _launch() {
 			mkdir -p "${HOME}/.config/gamebian" 2>/dev/null || true
 			: >"${HOME}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true
 		fi
-		if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ] \
-			&& [ -f "${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}" ]; then
-			return 0
-		fi
 		if [ "${_gamescope_tried}" -eq 1 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 			log "kiosk: gamescope unavailable — starting Steam on X once (no relaunch loop; GAMEBIAN_SKIP_GAMESCOPE=1 in steam-gamescope.env to skip gamescope)"
 			_use_gamescope=0
@@ -392,30 +365,5 @@ _launch() {
 	return 1
 }
 
-# LightDM kiosk: after Steam/gamescope quits, hand off to Openbox if user chose Switch to Desktop.
-if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
-	_launch "$@"
-	_handoff="${GAMEBIAN_SWITCH_OPENBOX:-${HOME}/.config/gamebian/switch-to-openbox}"
-	if [ -f "${_handoff}" ] || pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
-		if pgrep -u "$(id -un)" -x openbox >/dev/null 2>&1; then
-			log "Switch to Desktop: openbox already running — refresh desktop notices"
-			rm -f "${_handoff}" 2>/dev/null || true
-			gamebian_kiosk_openbox_handoff_set 2>/dev/null || true
-			gamebian_kiosk_marker_clear 2>/dev/null || true
-			gamebian_controller_menu_resume 2>/dev/null || true
-			if [ -x /usr/share/gamebian/gamebian-openbox-notify.sh ]; then
-				/usr/share/gamebian/gamebian-openbox-notify.sh --no-wait --desktop-session &
-			fi
-			exit 0
-		fi
-		log "Switch to Desktop: handoff to openbox-session"
-		gamebian_handoff_to_openbox_desktop
-		# Return to gamescope-session supervisor (same LightDM login).
-		exit 0
-	fi
-	exit $?
-fi
-
-# Openbox / menu: try gamescope, fall back to plain Steam on failure.
 _launch "$@"
 exit $?

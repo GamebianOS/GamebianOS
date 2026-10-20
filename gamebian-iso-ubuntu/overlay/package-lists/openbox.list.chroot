@@ -1,8 +1,6 @@
-# Minimal Ubuntu live ISO desktop (<2GB target).
-# Deferred to Calamares (live is try/install only):
-#   steam-installer, steam-devices, papirus (large), epiphany, RetroArch/emulators,
-#   flatpak, gamebian-web Python stack
-# See packages.conf + gamebian-web-install + gamebian-install-steam.
+# Live installer image. Openbox is only a window for Calamares and is removed
+# from the installed disk (packages.conf). No panel, file manager, or terminal.
+# Steam is installed by Calamares (packages.conf + gamebian-install-steam).
 
 sudo
 systemd-sysv
@@ -14,15 +12,7 @@ live-tools
 locales
 keyboard-configuration
 network-manager
-# Tray: nm-applet (GTK) — same as SamStation; Qt nm-tray often invisible in lxpanel.
-network-manager-applet
-bluez
-blueman
-qt5-gtk-platformtheme
-qt6-gtk-platformtheme
-qt6ct
-hicolor-icon-theme
-libqt5svg5
+# Standalone Wi-Fi dialog for the live installer (removed from the installed disk).
 nm-connection-editor
 mate-polkit
 gnome-keyring
@@ -35,35 +25,18 @@ openssh-server
 rsync
 vim
 x11-utils
-zenity
-libnotify-bin
-xfce4-notifyd
+hicolor-icon-theme
 
-# Papirus deferred to Calamares (hundreds of MB); live uses hicolor fallbacks.
 lightdm
 lightdm-gtk-greeter
 # LightDM only Recommends xserver-xorg — required explicitly with --apt-recommends false.
-# Without it the live ISO boots to getty (TTY) and Calamares never starts.
 xserver-xorg
-
 openbox
-python3
-python3-gi
-python3-evdev
-python3-tk
-gir1.2-nm-1.0
-lxappearance
-lxappearance-obconf
-lxrandr
-x11-xserver-utils
-lxpanel
-rofi
-feh
-thunar
-xfce4-terminal
-pavucontrol
 
-# gamescope from Ubuntu universe — needed after unpack onto disk; small vs Steam/emulators.
+python3
+x11-xserver-utils
+
+# gamescope from Ubuntu universe — needed on the installed system.
 gamescope
 xwayland
 # RADV/ANV (not a Recommends of xserver-xorg). gamescope needs this or it only sees llvmpipe.
@@ -73,7 +46,6 @@ calamares
 # Calamares unpackfs needs unsquashfs — only a Recommends of calamares.
 squashfs-tools
 # Calamares partition/format — not pulled with --apt-recommends false.
-# Without e2fsprogs, erase-disk install fails creating the ext4 filesystem.
 e2fsprogs
 dosfstools
 parted

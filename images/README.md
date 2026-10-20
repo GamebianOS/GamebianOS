@@ -25,14 +25,14 @@ cd Build/gamebian-iso-ubuntu
 
 | File | Used for |
 |------|----------|
-| `background.png` | Live ISO desktop wallpaper |
+| `background.png` | Live ISO artwork (copied into the installer image) |
 
 ## installed/
 
 | File | Used for |
 |------|----------|
-| `background.png` | Default installed wallpaper + LightDM greeter background |
-| `green.png`, `yellow.png`, `blue.png`, `red.png`, `black.png`, `purple.png` | Per-color wallpapers (right-click desktop → Change Background) |
+| `background.png` | LightDM greeter background |
+| `green.png`, `yellow.png`, `blue.png`, `red.png`, `black.png`, `purple.png` | Extra artwork copied to `/usr/share/backgrounds/gamebian-installed/` |
 
 All PNG/JPG files in this folder are copied to `/usr/share/backgrounds/gamebian-installed/` at build time.
 

@@ -162,7 +162,7 @@ if [[ -x "$INSTALL_GRUB" ]]; then
   "$INSTALL_GRUB" "$BUILD_ROOT/config"
 fi
 
-# Panel / rofi launcher icons: live ISO vs installed disk (see gamebian-menu*.desktop + lxpanel).
+# Menu icons copied for branding assets (controller menu / pixmaps).
 for _icon in menu-icon.png menu-icon-default.png; do
   if [[ -f "$IMAGES/icons/$_icon" ]]; then
     mkdir -p "$GAMEBIAN_PIX"
