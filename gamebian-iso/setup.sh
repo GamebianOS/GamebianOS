@@ -44,11 +44,9 @@ lb config \
   --bootloaders "grub-pc grub-efi" \
   --bootappend-live "$_bootappend"
 
-# GRUB: live USB (bootloaders/) + installed disk (branding/grub, ceratopsian) — same PNG as Calamares.
+# GRUB branding is applied after the overlay is merged (needs the live-build config dir).
 INSTALL_GRUB="$SCRIPT_ROOT/../share/gamebian/install-grub-branding.sh"
-if [[ -x "$INSTALL_GRUB" ]]; then
-  "$INSTALL_GRUB"
-else
+if [[ ! -x "$INSTALL_GRUB" ]]; then
   echo "WARNING: missing $INSTALL_GRUB — live ISO may show ${GAMEBIAN_GRUB_FALLBACK_MSG}." >&2
 fi
 
@@ -64,11 +62,7 @@ fi
 if [[ -d "$OVERLAY/includes.chroot_before_packages" ]]; then
   cp -a "$OVERLAY/includes.chroot_before_packages/." config/includes.chroot_before_packages/
 fi
-# Branding palette color themes (green, yellow, blue, red, black, purple) under etc/skel/.themes/
-GEN_COLOR_THEMES="$SCRIPT_ROOT/../share/gamebian/generate-color-themes.py"
-if [[ -f "$GEN_COLOR_THEMES" ]] && command -v python3 >/dev/null 2>&1; then
-  python3 "$GEN_COLOR_THEMES"
-fi
+# Desktop GTK/Openbox/rofi color themes are not part of the gamescope appliance.
 if [[ -d "$OVERLAY/includes.chroot" ]]; then
   cp -a "$OVERLAY/includes.chroot/." config/includes.chroot/
 fi
