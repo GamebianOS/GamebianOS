@@ -192,7 +192,7 @@ else
   echo "WARNING: missing $GAMEBIAN_CTRL_SRC — ISO will lack gamebian_controller_menu.py" >&2
 fi
 
-# Installed session wallpapers: background.png + per-color PNGs (green.png, …).
+# Optional wallpaper drop-ins. The console image does not ship these.
 INST_ART="$IMAGES/installed"
 INST_BG="$INST_ART/background.png"
 INST_BG_DEST="$BUILD_ROOT/config/includes.chroot/usr/share/backgrounds/gamebian-installed"

@@ -21,22 +21,7 @@ cd Build/gamebian-iso-ubuntu
 | `user-icon.png` | Calamares sidebar logo + window icon (`user-login.png` also accepted) |
 | `image.png` | Calamares welcome screen + slideshow hero |
 
-## live/
-
-| File | Used for |
-|------|----------|
-| `background.png` | Live ISO artwork (copied into the installer image) |
-
-## installed/
-
-| File | Used for |
-|------|----------|
-| `background.png` | LightDM greeter background |
-| `green.png`, `yellow.png`, `blue.png`, `red.png`, `black.png`, `purple.png` | Extra artwork copied to `/usr/share/backgrounds/gamebian-installed/` |
-
-All PNG/JPG files in this folder are copied to `/usr/share/backgrounds/gamebian-installed/` at build time.
-
-Recommended size: ~16:9 (e.g. 2752×1536).
+The installed system has no desktop, so there is no live or installed wallpaper set.
 
 ## grub/
 
