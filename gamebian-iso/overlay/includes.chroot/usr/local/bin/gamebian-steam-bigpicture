@@ -197,21 +197,18 @@ case "${STEAM_BIGPICTURE_UI:-gamepad}" in
 	plain|desktop) _steam_mode="" ;;
 esac
 
-# Under gamescope, Steam uses the SteamOS power menu and expects steamos-session-select for
-# "Switch to Desktop". -steamos3 switches the client to steamdeck_stable (needs a download).
-# Only pass it when gamescope is actually used — otherwise Steam dies with
-# "needs to be online to update" if the Deck client is not cached yet.
+# -steamos3 is the Deck settings UI. That is the screen with the Wi-Fi list.
+# Gamescope or not does not matter: without this flag, gamepad mode has no
+# Wi-Fi page. It also selects the steamdeck client branch, which needs a
+# network the first time that branch is not cached yet.
+# Opt out: GAMEBIAN_STEAM_NO_STEAMOS3=1
 _steam_extras=""
 case "${GAMEBIAN_STEAM_NO_STEAMOS3:-}" in
 	1|yes|true|YES|TRUE) ;;
 	*)
 		case "${STEAM_BIGPICTURE_UI:-gamepad}" in
 			plain|desktop) ;;
-			*)
-				if [ "$_use_gamescope" -eq 1 ]; then
-					_steam_extras="-steamos3"
-				fi
-				;;
+			*) _steam_extras="-steamos3" ;;
 		esac
 		;;
 esac
@@ -301,10 +298,12 @@ _run_gamescope() {
 	esac
 	log "exec: $GAMESCOPE_BIN $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_GAMESCOPE_HIDE_CURSOR $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- $STEAM_BIN ${_steam_extras} $_steam_args"
 	# shellcheck disable=SC2086
+	_gs_start=$(date +%s)
 	"$GAMESCOPE_BIN" $_EMBED_UNDER_X $FULLSCREEN $_GAMESCOPE_WH $_GAMESCOPE_GAME_WH $_GAMESCOPE_REFRESH $_GAMESCOPE_HIDE_CURSOR $_xwayland ${GAMEBIAN_GAMESCOPE_EXTRA_ARGS:-} -- "$STEAM_BIN" ${_steam_extras} $_steam_args "$@" &
 	_gs_pid=$!
 	_rc=0
 	wait "$_gs_pid" 2>/dev/null || _rc=$?
+	GAMEBIAN_GAMESCOPE_RAN_SECS=$(( $(date +%s) - _gs_start ))
 	# gamescope can exit 0 immediately when a second instance races the first.
 	if [ "${_rc}" -eq 0 ] && [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 		sleep 1
@@ -333,7 +332,14 @@ _launch() {
 		if _run_gamescope "$_steam_mode"; then
 			return 0
 		fi
-		log "gamescope exited $? (mode=${_steam_mode}; common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
+		log "gamescope exited $? after ${GAMEBIAN_GAMESCOPE_RAN_SECS:-0}s (mode=${_steam_mode}; common on VirtualBox/llvmpipe: no VK_EXT_physical_device_drm)"
+		# A session that actually ran and then quit (Steam exit, or a game
+		# returning to the menu) must come back under gamescope. Bare X leaves
+		# the game behind Steam's fullscreen window, so the button sticks on Resume.
+		if [ "${GAMEBIAN_GAMESCOPE_RAN_SECS:-0}" -ge 20 ]; then
+			log "gamescope ran — not falling back to bare X"
+			return 1
+		fi
 		if [ -n "${GAMEBIAN_GAMESCOPE_SESSION:-}" ]; then
 			mkdir -p "${HOME}/.config/gamebian" 2>/dev/null || true
 			: >"${HOME}/.config/gamebian/steam-without-gamescope" 2>/dev/null || true

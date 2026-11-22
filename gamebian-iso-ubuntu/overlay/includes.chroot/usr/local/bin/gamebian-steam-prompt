@@ -1,0 +1,600 @@
+#!/usr/bin/env python3
+"""Fullscreen Install / Cancel prompt on the host X display.
+
+Gamescope scans its own frame. GTK4 zenity and xmessage put their text and
+buttons in child windows, and that frame stays black. This draws the question
+into one window on the Xorg display (:0) and, while it is up, unmaps the
+gamescope window so the panel shows this prompt.
+"""
+import argparse
+import ctypes
+import os
+import select
+import subprocess
+import sys
+import time
+
+X11 = ctypes.cdll.LoadLibrary("libX11.so.6")
+
+# Same palette as the Calamares installer (branding.desc / stylesheet.qss).
+COLOR_WHITE = 0xFFFFFF
+COLOR_BLACK = 0x000000
+COLOR_BLUE = 0x0145F2
+
+
+def _fn(name, restype, *argtypes):
+	fn = getattr(X11, name)
+	fn.restype = restype
+	fn.argtypes = list(argtypes)
+	return fn
+
+
+c_void = ctypes.c_void_p
+c_win = ctypes.c_ulong
+c_int = ctypes.c_int
+c_uint = ctypes.c_uint
+c_ulong = ctypes.c_ulong
+c_long = ctypes.c_long
+
+XOpenDisplay = _fn("XOpenDisplay", c_void, ctypes.c_char_p)
+XCloseDisplay = _fn("XCloseDisplay", c_int, c_void)
+XDefaultScreen = _fn("XDefaultScreen", c_int, c_void)
+XDisplayWidth = _fn("XDisplayWidth", c_int, c_void, c_int)
+XDisplayHeight = _fn("XDisplayHeight", c_int, c_void, c_int)
+XRootWindow = _fn("XRootWindow", c_win, c_void, c_int)
+XCreateSimpleWindow = _fn(
+	"XCreateSimpleWindow", c_win,
+	c_void, c_win, c_int, c_int, c_uint, c_uint, c_uint, c_ulong, c_ulong,
+)
+XChangeWindowAttributes = _fn("XChangeWindowAttributes", c_int, c_void, c_win, c_ulong, c_void)
+XSelectInput = _fn("XSelectInput", c_int, c_void, c_win, c_long)
+XMapRaised = _fn("XMapRaised", c_int, c_void, c_win)
+XRaiseWindow = _fn("XRaiseWindow", c_int, c_void, c_win)
+XUnmapWindow = _fn("XUnmapWindow", c_int, c_void, c_win)
+XMapWindow = _fn("XMapWindow", c_int, c_void, c_win)
+XFlush = _fn("XFlush", c_int, c_void)
+XSync = _fn("XSync", c_int, c_void, c_int)
+XPending = _fn("XPending", c_int, c_void)
+XNextEvent = _fn("XNextEvent", c_int, c_void, c_void)
+XConnectionNumber = _fn("XConnectionNumber", c_int, c_void)
+XCreateGC = _fn("XCreateGC", c_void, c_void, c_win, c_ulong, c_void)
+XSetForeground = _fn("XSetForeground", c_int, c_void, c_void, c_ulong)
+XSetFont = _fn("XSetFont", c_int, c_void, c_void, c_ulong)
+XFillRectangle = _fn(
+	"XFillRectangle", c_int,
+	c_void, c_win, c_void, c_int, c_int, c_uint, c_uint,
+)
+XDrawString = _fn(
+	"XDrawString", c_int,
+	c_void, c_win, c_void, c_int, c_int, ctypes.c_char_p, c_int,
+)
+XTextWidth = _fn("XTextWidth", c_int, c_void, ctypes.c_char_p, c_int)
+XLoadQueryFont = _fn("XLoadQueryFont", c_void, c_void, ctypes.c_char_p)
+XQueryTree = _fn(
+	"XQueryTree", c_int,
+	c_void, c_win,
+	ctypes.POINTER(c_win), ctypes.POINTER(c_win),
+	ctypes.POINTER(ctypes.POINTER(c_win)), ctypes.POINTER(c_uint),
+)
+XFree = _fn("XFree", c_int, c_void)
+XStoreName = _fn("XStoreName", c_int, c_void, c_win, ctypes.c_char_p)
+XGetWindowAttributes = _fn("XGetWindowAttributes", c_int, c_void, c_win, c_void)
+XTranslateCoordinates = _fn(
+	"XTranslateCoordinates", c_int,
+	c_void, c_win, c_win, c_int, c_int,
+	ctypes.POINTER(c_int), ctypes.POINTER(c_int), ctypes.POINTER(c_win),
+)
+XGetGeometry = _fn(
+	"XGetGeometry", c_int,
+	c_void, c_win, ctypes.POINTER(c_win),
+	ctypes.POINTER(c_int), ctypes.POINTER(c_int),
+	ctypes.POINTER(c_uint), ctypes.POINTER(c_uint),
+	ctypes.POINTER(c_uint), ctypes.POINTER(c_uint),
+)
+XFetchName = _fn("XFetchName", c_int, c_void, c_win, ctypes.POINTER(c_void))
+XSetInputFocus = _fn("XSetInputFocus", c_int, c_void, c_win, c_int, c_ulong)
+XKeysymToKeycode = _fn("XKeysymToKeycode", c_uint, c_void, c_ulong)
+XGrabPointer = _fn(
+	"XGrabPointer", c_int,
+	c_void, c_win, c_int, c_uint, c_int, c_int, c_win, c_win, c_ulong,
+)
+XGrabKeyboard = _fn("XGrabKeyboard", c_int, c_void, c_win, c_int, c_int, c_ulong)
+
+CWOverrideRedirect = 1 << 9
+ExposureMask = 1 << 15
+ButtonPressMask = 1 << 2
+KeyPressMask = 1 << 0
+IsViewable = 2
+XK_Return = 0xFF0D
+XK_Escape = 0xFF1B
+
+FONTS = (
+	b"-adobe-helvetica-bold-r-normal--34-240-100-100-p-182-iso8859-1",
+	b"-adobe-helvetica-bold-r-normal--24-240-75-75-p-138-iso8859-1",
+	b"-misc-fixed-medium-r-normal--20-200-75-75-c-100-iso8859-1",
+	b"fixed",
+)
+
+
+class XSetWindowAttributes(ctypes.Structure):
+	_fields_ = [
+		("background_pixmap", c_ulong),
+		("background_pixel", c_ulong),
+		("border_pixmap", c_ulong),
+		("border_pixel", c_ulong),
+		("bit_gravity", c_int),
+		("win_gravity", c_int),
+		("backing_store", c_int),
+		("backing_planes", c_ulong),
+		("backing_pixel", c_ulong),
+		("save_under", c_int),
+		("event_mask", c_long),
+		("do_not_propagate_mask", c_long),
+		("override_redirect", c_int),
+		("colormap", c_ulong),
+		("cursor", c_ulong),
+	]
+
+
+class XWindowAttributes(ctypes.Structure):
+	_fields_ = [
+		("x", c_int), ("y", c_int), ("width", c_int), ("height", c_int),
+		("border_width", c_int), ("depth", c_int),
+		("visual", c_void), ("root", c_win), ("cls", c_int),
+		("bit_gravity", c_int), ("win_gravity", c_int), ("backing_store", c_int),
+		("backing_planes", c_ulong), ("backing_pixel", c_ulong),
+		("save_under", c_int), ("colormap", c_ulong), ("map_installed", c_int),
+		("map_state", c_int), ("all_event_masks", c_long), ("your_event_mask", c_long),
+		("do_not_propagate_mask", c_long), ("override_redirect", c_int),
+		("screen", c_void),
+	]
+
+
+class XClassHint(ctypes.Structure):
+	_fields_ = [("res_name", c_void), ("res_class", c_void)]
+
+
+class XButtonEvent(ctypes.Structure):
+	_fields_ = [
+		("type", c_int),
+		("serial", c_ulong),
+		("send_event", c_int),
+		("display", c_void),
+		("window", c_win),
+		("root", c_win),
+		("subwindow", c_win),
+		("time", c_ulong),
+		("x", c_int),
+		("y", c_int),
+		("x_root", c_int),
+		("y_root", c_int),
+		("state", c_uint),
+		("button", c_uint),
+		("same_screen", c_int),
+	]
+
+
+class XKeyEvent(ctypes.Structure):
+	_fields_ = [
+		("type", c_int),
+		("serial", c_ulong),
+		("send_event", c_int),
+		("display", c_void),
+		("window", c_win),
+		("root", c_win),
+		("subwindow", c_win),
+		("time", c_ulong),
+		("x", c_int),
+		("y", c_int),
+		("x_root", c_int),
+		("y_root", c_int),
+		("state", c_uint),
+		("keycode", c_uint),
+		("same_screen", c_int),
+	]
+
+
+class XEvent(ctypes.Union):
+	_fields_ = [
+		("type", c_int),
+		("xbutton", XButtonEvent),
+		("xkey", XKeyEvent),
+		("pad", ctypes.c_byte * 256),
+	]
+
+
+XGetClassHint = _fn("XGetClassHint", c_int, c_void, c_win, ctypes.POINTER(XClassHint))
+
+
+def log(msg):
+	path = os.path.expanduser("~/.cache/gamebian/steam-prompt.log")
+	try:
+		os.makedirs(os.path.dirname(path), exist_ok=True)
+		with open(path, "a", encoding="utf-8") as fh:
+			fh.write(time.strftime("%H:%M:%S ") + msg + "\n")
+	except OSError:
+		pass
+	print(msg, file=sys.stderr)
+
+
+def children(dpy, win):
+	root_ret = c_win()
+	parent = c_win()
+	kids = ctypes.POINTER(c_win)()
+	nk = c_uint()
+	if not XQueryTree(dpy, win, ctypes.byref(root_ret), ctypes.byref(parent), ctypes.byref(kids), ctypes.byref(nk)):
+		return []
+	out = [kids[i] for i in range(nk.value)]
+	if nk.value and kids:
+		XFree(ctypes.cast(kids, c_void))
+	return out
+
+
+def window_name(dpy, win):
+	ptr = c_void()
+	if not XFetchName(dpy, win, ctypes.byref(ptr)) or not ptr.value:
+		return ""
+	text = ctypes.cast(ptr, ctypes.c_char_p).value.decode("latin1", "replace")
+	XFree(ptr)
+	return text
+
+
+def find_gamescope(dpy, root):
+	for win in children(dpy, root):
+		if window_name(dpy, win) == "gamescope":
+			return win
+	return None
+
+
+def mapped(dpy, win):
+	attr = XWindowAttributes()
+	if not XGetWindowAttributes(dpy, win, ctypes.byref(attr)):
+		return False
+	return attr.map_state == IsViewable
+
+
+def geometry(dpy, win):
+	root = c_win()
+	x = c_int()
+	y = c_int()
+	w = c_uint()
+	h = c_uint()
+	bw = c_uint()
+	depth = c_uint()
+	XGetGeometry(
+		dpy, win, ctypes.byref(root),
+		ctypes.byref(x), ctypes.byref(y), ctypes.byref(w), ctypes.byref(h),
+		ctypes.byref(bw), ctypes.byref(depth),
+	)
+	return x.value, y.value, w.value, h.value
+
+
+def load_font(dpy):
+	for name in FONTS:
+		font = XLoadQueryFont(dpy, name)
+		if font:
+			fid = ctypes.cast(font, ctypes.POINTER(c_ulong))[1]
+			log("font %s" % name.decode())
+			return font, fid
+	raise SystemExit("no X font available")
+
+
+def wrap(dpy, font, text, width):
+	lines = []
+	for para in text.splitlines():
+		if not para.strip():
+			lines.append("")
+			continue
+		cur = ""
+		for word in para.split():
+			trial = word if not cur else cur + " " + word
+			raw = trial.encode("latin1", "replace")
+			if XTextWidth(font, raw, len(raw)) > width and cur:
+				lines.append(cur)
+				cur = word
+			else:
+				cur = trial
+		if cur:
+			lines.append(cur)
+	return lines
+
+
+def steam_ready():
+	home = os.path.expanduser("~")
+	for rel in (
+		".steam/debian-installation/steam.sh",
+		".local/share/Steam/steam.sh",
+		".steam/steam/steam.sh",
+	):
+		if os.path.isfile(os.path.join(home, rel)) and os.access(os.path.join(home, rel), os.X_OK):
+			return True
+	return False
+
+
+def find_xmessage(dpy):
+	root = XRootWindow(dpy, XDefaultScreen(dpy))
+	found = []
+
+	def walk(win, depth=0):
+		if depth > 4:
+			return
+		label = window_name(dpy, win)
+		if label in ("Steam installer", "xmessage"):
+			found.append(win)
+		for kid in children(dpy, win):
+			walk(kid, depth + 1)
+
+	walk(root)
+	return found[0] if found else None
+
+
+def button_point(dpy, win, want_ok):
+	"""Return root coordinates of the Install (wider) or Cancel button."""
+	_, _, pw, ph = geometry(dpy, win)
+	cands = []
+	for kid in children(dpy, win):
+		for grand in [kid] + children(dpy, kid):
+			x, y, w, h = geometry(dpy, grand)
+			if 20 <= w <= 400 and 16 <= h <= 80 and y > ph // 2:
+				cands.append((w, grand))
+	if not cands:
+		return None
+	cands.sort()
+	target = cands[-1][1] if want_ok else cands[0][1]
+	x, y, w, h = geometry(dpy, target)
+	rx = c_int()
+	ry = c_int()
+	child = c_win()
+	root = XRootWindow(dpy, XDefaultScreen(dpy))
+	XTranslateCoordinates(dpy, target, root, w // 2, h // 2, ctypes.byref(rx), ctypes.byref(ry), ctypes.byref(child))
+	return rx.value, ry.value
+
+
+def ack_existing(want_ok):
+	try:
+		xtst = ctypes.cdll.LoadLibrary("libXtst.so.6")
+	except OSError as exc:
+		log("no XTest: %s" % exc)
+		return False
+	xtst.XTestFakeMotionEvent.argtypes = [c_void, c_int, c_int, c_int, c_ulong]
+	xtst.XTestFakeButtonEvent.argtypes = [c_void, c_uint, c_int, c_ulong]
+	xtst.XTestFakeKeyEvent.argtypes = [c_void, c_uint, c_int, c_ulong]
+	dpy = XOpenDisplay(b":1")
+	if not dpy:
+		log("cannot open :1 to answer the installer")
+		return False
+	win = find_xmessage(dpy)
+	if not win:
+		XCloseDisplay(dpy)
+		log("xmessage window not found")
+		return False
+	XSetInputFocus(dpy, win, 1, 0)
+	if want_ok:
+		kc = XKeysymToKeycode(dpy, XK_Return)
+		xtst.XTestFakeKeyEvent(dpy, kc, 1, 0)
+		xtst.XTestFakeKeyEvent(dpy, kc, 0, 0)
+		log("sent Return to installer")
+	point = button_point(dpy, win, want_ok)
+	if point:
+		xtst.XTestFakeMotionEvent(dpy, -1, point[0], point[1], 0)
+		xtst.XTestFakeButtonEvent(dpy, 1, 1, 0)
+		xtst.XTestFakeButtonEvent(dpy, 1, 0, 0)
+		log("clicked %s at %s" % ("Install" if want_ok else "Cancel", point))
+	XFlush(dpy)
+	XSync(dpy, 0)
+	XCloseDisplay(dpy)
+	return True
+
+
+def main():
+	parser = argparse.ArgumentParser(description="Visible Steam installer prompt")
+	parser.add_argument("--title", default="Steam installer")
+	parser.add_argument("--text", default="")
+	parser.add_argument("--ok", default="Install")
+	parser.add_argument("--cancel", default="Cancel")
+	parser.add_argument("--installing", action="store_true")
+	parser.add_argument("--ack-existing", action="store_true")
+	parser.add_argument("--hold", action="store_true", help="Stay up and keep blank fullscreen frames off the panel")
+	parser.add_argument("--display", default=os.environ.get("GAMEBIAN_PROMPT_DISPLAY", ":0"))
+	args = parser.parse_args()
+
+	dpy = XOpenDisplay(args.display.encode())
+	if not dpy:
+		log("cannot open %s" % args.display)
+		return 1
+	scr = XDefaultScreen(dpy)
+	sw = XDisplayWidth(dpy, scr)
+	sh = XDisplayHeight(dpy, scr)
+	root = XRootWindow(dpy, scr)
+	font, fid = load_font(dpy)
+	gs = find_gamescope(dpy, root)
+	log("screen %sx%s gamescope %s" % (sw, sh, hex(gs) if gs else "none"))
+
+	bg = COLOR_WHITE
+	win = XCreateSimpleWindow(dpy, root, 0, 0, sw, sh, 0, 0, bg)
+	attr = XSetWindowAttributes()
+	attr.override_redirect = 1
+	attr.background_pixel = bg
+	XChangeWindowAttributes(dpy, win, CWOverrideRedirect | (1 << 1), ctypes.byref(attr))
+	XSelectInput(dpy, win, ExposureMask | ButtonPressMask | KeyPressMask)
+	XStoreName(dpy, win, b"Steam installer")
+	XMapRaised(dpy, win)
+	gc = XCreateGC(dpy, win, 0, None)
+	XSetFont(dpy, gc, fid)
+
+	def hide_gamescope():
+		nonlocal gs
+		found = find_gamescope(dpy, root)
+		if found:
+			gs = found
+		# Gamescope and Steam Big Picture flip their own GPU buffer onto the
+		# panel. Core X windows underneath that flip stay invisible, so any
+		# near-fullscreen window except this prompt has to leave the screen.
+		for other in children(dpy, root):
+			if other == win:
+				continue
+			_x, _y, ow, oh = geometry(dpy, other)
+			name = window_name(dpy, other)
+			covers = ow >= sw - 40 and oh >= sh - 40
+			if covers or name in ("gamescope", "Steam Big Picture Mode"):
+				if mapped(dpy, other):
+					XUnmapWindow(dpy, other)
+		XRaiseWindow(dpy, win)
+		XFlush(dpy)
+
+	def modeset():
+		env = os.environ.copy()
+		env["DISPLAY"] = args.display
+		rc = subprocess.call(
+			["xrandr", "--output", "eDP", "--mode", "1920x1200", "--rate", "60"],
+			env=env,
+		)
+		log("modeset eDP 1920x1200@60 -> %s" % rc)
+
+	def show_gamescope():
+		if gs:
+			XMapWindow(dpy, gs)
+			XFlush(dpy)
+
+	hide_gamescope()
+	if args.hold:
+		modeset()
+		hide_gamescope()
+	grab = XGrabPointer(dpy, win, 1, ButtonPressMask, 1, 1, win, 0, 0)
+	kgrab = XGrabKeyboard(dpy, win, 1, 1, 1, 0)
+	log("grabs pointer=%s keyboard=%s" % (grab, kgrab))
+	XFlush(dpy)
+
+	state = {"mode": "installing" if args.installing else "ask", "choice": None}
+	buttons = []
+
+	def paint():
+		buttons.clear()
+		XSetForeground(dpy, gc, bg)
+		XFillRectangle(dpy, win, gc, 0, 0, sw, sh)
+		XSetForeground(dpy, gc, COLOR_BLUE)
+		XFillRectangle(dpy, win, gc, 0, 0, sw, 16)
+		XFillRectangle(dpy, win, gc, 0, sh - 16, sw, 16)
+		margin = 80
+		y = 120
+		XSetForeground(dpy, gc, COLOR_BLACK)
+		title = args.title.encode("latin1", "replace")
+		XDrawString(dpy, win, gc, margin, y, title, len(title))
+		y += 64
+		if state["mode"] == "ask":
+			if args.hold:
+				body = args.text or "The display is on.\n\nSteam is installed. Its own window was a blank frame, so this screen is covering it."
+				extra = "If you can read this, tap the blue button."
+			else:
+				body = args.text or "Steam will be installed on this handheld."
+				extra = "Press Install to start the download."
+			lines = wrap(dpy, font, body, sw - margin * 2) + ["", extra]
+			for line in lines:
+				raw = line.encode("latin1", "replace")
+				if raw:
+					XDrawString(dpy, win, gc, margin, y, raw, len(raw))
+				y += 44
+			bw = sw - margin * 2
+			by = sh - 360
+			bh = 150
+			buttons.append((margin, by, bw, bh, "ok"))
+			XSetForeground(dpy, gc, COLOR_BLUE)
+			XFillRectangle(dpy, win, gc, margin, by, bw, bh)
+			XSetForeground(dpy, gc, COLOR_WHITE)
+			label = args.ok.encode("latin1", "replace")
+			lw = XTextWidth(font, label, len(label))
+			XDrawString(dpy, win, gc, margin + max(0, (bw - lw) // 2), by + 88, label, len(label))
+			cy = by + bh + 24
+			ch = 110
+			buttons.append((margin, cy, bw, ch, "cancel"))
+			XSetForeground(dpy, gc, COLOR_BLACK)
+			XFillRectangle(dpy, win, gc, margin, cy, bw, ch)
+			XSetForeground(dpy, gc, COLOR_WHITE)
+			cl = args.cancel.encode("latin1", "replace")
+			cw = XTextWidth(font, cl, len(cl))
+			XDrawString(dpy, win, gc, margin + max(0, (bw - cw) // 2), cy + 68, cl, len(cl))
+		else:
+			lines = wrap(
+				dpy, font,
+				"Installing Steam.\n\nThe download is running. Steam opens when it finishes.",
+				sw - margin * 2,
+			)
+			for line in lines:
+				raw = line.encode("latin1", "replace")
+				if raw:
+					XDrawString(dpy, win, gc, margin, y, raw, len(raw))
+				y += 44
+		XFlush(dpy)
+
+	paint()
+	fd = XConnectionNumber(dpy)
+	deadline = time.time() + (240 if state["mode"] == "installing" else 0)
+
+	try:
+		while True:
+			hide_gamescope()
+			while XPending(dpy):
+				ev = XEvent()
+				XNextEvent(dpy, ctypes.byref(ev))
+				kind = ev.type
+				if kind == 12:
+					paint()
+				elif kind == 4 and state["mode"] == "ask":
+					x, y = ev.xbutton.x, ev.xbutton.y
+					for bx, by, bw, bh, name in buttons:
+						if bx <= x < bx + bw and by <= y < by + bh:
+							state["choice"] = name
+							log("choice %s at %s,%s" % (name, x, y))
+				elif kind == 2 and state["mode"] == "ask":
+					sym_code = ev.xkey.keycode
+					ret = XKeysymToKeycode(dpy, XK_Return)
+					esc = XKeysymToKeycode(dpy, XK_Escape)
+					if sym_code == ret:
+						state["choice"] = "ok"
+					elif sym_code == esc:
+						state["choice"] = "cancel"
+			if args.hold and state["choice"]:
+				log("screen tapped %s" % state["choice"])
+				state["mode"] = "ask"
+				state["choice"] = None
+				args.text = "Tap received. The display is working."
+				paint()
+			elif state["choice"] == "ok":
+				if args.ack_existing and not ack_existing(True):
+					state["choice"] = None
+					continue
+				if args.ack_existing:
+					# Steam's script is blocked on the hidden dialog. After it
+					# is answered, keep this window up until the client lands.
+					state["mode"] = "installing"
+					state["choice"] = None
+					deadline = time.time() + 240
+					paint()
+				else:
+					# Return so the Steam script can start the download.
+					break
+			elif state["choice"] == "cancel":
+				if args.ack_existing:
+					ack_existing(False)
+				state["choice"] = "cancel"
+				break
+			if state["mode"] == "installing":
+				if steam_ready() or (deadline and time.time() > deadline):
+					log("install wait done ready=%s" % steam_ready())
+					break
+			select.select([fd], [], [], 0.25)
+	finally:
+		if not args.hold:
+			show_gamescope()
+		XSync(dpy, 0)
+		XCloseDisplay(dpy)
+
+	return 1 if state["choice"] == "cancel" else 0
+
+
+if __name__ == "__main__":
+	try:
+		sys.exit(main())
+	except Exception as exc:
+		log("prompt failed: %s" % exc)
+		raise

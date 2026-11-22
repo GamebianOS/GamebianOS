@@ -82,17 +82,19 @@ if ! gamebian_steam_binary_present 2>/dev/null; then
 	exit 1
 fi
 
-if gamebian_use_steam_without_gamescope 2>/dev/null; then
-	printf '%s gamescope-session: no working gamescope — Steam on X (GAMEBIAN_SKIP_GAMESCOPE)\n' \
-		"$(_ts)" >>"$_log" 2>/dev/null || true
-	export GAMEBIAN_SKIP_GAMESCOPE=1
-else
-	printf '%s gamescope-session: starting kiosk (ldm=%s)\n' \
-		"$(_ts)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
-fi
-
 # Restart gamescope when Steam exits. There is no desktop session to fall back to.
+# Re-check every launch. A marker written during the installer must not stick
+# for the rest of the seat, or games open underneath Steam and the button stays on Resume.
 while :; do
+	if gamebian_use_steam_without_gamescope 2>/dev/null; then
+		printf '%s gamescope-session: no working gamescope — Steam on X (GAMEBIAN_SKIP_GAMESCOPE)\n' \
+			"$(_ts)" >>"$_log" 2>/dev/null || true
+		export GAMEBIAN_SKIP_GAMESCOPE=1
+	else
+		unset GAMEBIAN_SKIP_GAMESCOPE
+		printf '%s gamescope-session: starting kiosk (ldm=%s)\n' \
+			"$(_ts)" "${GAMEBIAN_LIGHTDM_SESSION}" >>"$_log" 2>/dev/null || true
+	fi
 	gamebian_kiosk_marker_set 2>/dev/null || true
 	gamebian_request_gamescope_kiosk_clear 2>/dev/null || true
 	gamebian_controller_menu_pause 2>/dev/null || true

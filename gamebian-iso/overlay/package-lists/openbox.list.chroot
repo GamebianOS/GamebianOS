@@ -12,6 +12,12 @@ live-tools
 locales
 keyboard-configuration
 network-manager
+# NM cannot bring up Wi-Fi without this. Steam's network icon reads NetworkManager.
+wpasupplicant
+# Steam's audio icon speaks PulseAudio. pipewire-pulse is that socket.
+pipewire
+pipewire-pulse
+wireplumber
 # Standalone Wi-Fi dialog for the live installer (removed from the installed disk).
 nm-connection-editor
 # PolKit GUI agent (policykit-1-gnome removed from Trixie — mate-polkit provides prompts).

@@ -1,0 +1,49 @@
+#!/bin/sh
+# GTK4 zenity maps a fullscreen window under gamescope whose child surface stays 1x1,
+# so the Steam installer question is a blank screen. xmessage paints a real X window
+# with the same question, and its exit code matches zenity --question (0 install, 1 cancel).
+REAL=/usr/bin/zenity
+
+question=0
+text=""
+title=""
+ok="OK"
+cancel="Cancel"
+prev=""
+for arg in "$@"; do
+	case "$arg" in
+	--question) question=1 ;;
+	--text=*) text=${arg#--text=} ;;
+	--title=*) title=${arg#--title=} ;;
+	--ok-label=*) ok=${arg#--ok-label=} ;;
+	--cancel-label=*) cancel=${arg#--cancel-label=} ;;
+	--text | --title | --ok-label | --cancel-label)
+		prev=$arg
+		continue
+		;;
+	esac
+	case "$prev" in
+	--text) text=$arg ;;
+	--title) title=$arg ;;
+	--ok-label) ok=$arg ;;
+	--cancel-label) cancel=$arg ;;
+	esac
+	prev=""
+done
+
+if [ "$question" = 1 ] && [ -x /usr/local/bin/gamebian-steam-prompt ]; then
+	/usr/local/bin/gamebian-steam-prompt \
+		--title "$title" \
+		--ok "$ok" \
+		--cancel "$cancel" \
+		--text "$text"
+	_rc=$?
+	# The script above has to return before Steam will download. Keep a
+	# fullscreen status window on the panel until the client is on disk.
+	if [ "$_rc" -eq 0 ]; then
+		/usr/local/bin/gamebian-steam-prompt --installing >/dev/null 2>&1 &
+	fi
+	exit "$_rc"
+fi
+
+exec "$REAL" "$@"
